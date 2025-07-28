@@ -14,9 +14,9 @@ export interface Recommendation {
   type: string;
   image?: string;
   rating?: number;
-  address?: string; // Changed from 'location' to 'address' to match usage
+  address?: string;
   description?: string;
-  tags: string[]; // Made required since it's used in filtering
+  tags: string[];
   price?: string;
   latitude?: number;
   longitude?: number;
@@ -43,21 +43,44 @@ export interface Itinerary {
 }
 
 // API Configuration
-const QLOO_API_BASE = "https://api.qloo.com/v2";
+const QLOO_API_BASE = "https://hackathon.api.qloo.com/v2";
 const QLOO_API_KEY = process.env.QLOO_API_KEY || "";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 
-// Qloo API Headers
-const getQlooHeaders = () => ({
-  Authorization: `Bearer ${QLOO_API_KEY}`,
-  "Content-Type": "application/json",
-});
+// Debug logging
+console.log("=== API Keys Debug ===");
+console.log("QLOO_API_KEY present:", !!QLOO_API_KEY);
+console.log("QLOO_API_KEY length:", QLOO_API_KEY.length);
+console.log("OPENAI_API_KEY present:", !!OPENAI_API_KEY);
+console.log("OPENAI_API_KEY length:", OPENAI_API_KEY.length);
 
-// OpenAI API Headers
-const getOpenAIHeaders = () => ({
-  Authorization: `Bearer ${OPENAI_API_KEY}`,
-  "Content-Type": "application/json",
-});
+// Qloo API Headers - Try different auth methods
+const getQlooHeaders = () => {
+  console.log(
+    "Using Qloo API Key:",
+    QLOO_API_KEY ? `${QLOO_API_KEY.substring(0, 10)}...` : "MISSING"
+  );
+
+  // Try X-API-Key header instead of Bearer (Qloo might use this format)
+  return {
+    "x-api-key": QLOO_API_KEY,
+    "Content-Type": "application/json",
+  };
+
+  // Alternative: Bearer token
+  // return {
+  //   'Authorization': `Bearer ${QLOO_API_KEY}`,
+  //   'Content-Type': 'application/json',
+  // };
+};
+
+// OpenAI API Headers - IMPLEMENT THIS FUNCTION
+const getOpenAIHeaders = () => {
+  return {
+    Authorization: `Bearer ${OPENAI_API_KEY}`,
+    "Content-Type": "application/json",
+  };
+};
 
 // Map user interests to Qloo categories
 const mapInterestsToQlooCategories = (interests: string[]): string[] => {
@@ -91,34 +114,272 @@ Travel Style: ${preferences.travelStyle}
 Interests: ${preferences.interests.join(", ")}
 Departure Date: ${preferences.departureDate || "Not specified"}
 
-Please provide detailed recommendations including:
-1. Must-visit attractions
-2. Local cuisine recommendations
-3. Hidden gems
-4. Activity timing suggestions
-5. Budget-specific tips
-6. Cultural insights
+Please provide ${
+    preferences.numberOfDays * 2
+  } specific recommendations in this JSON format:
+[
+  {
+    "name": "Location Name",
+    "type": "Category (e.g., Restaurant, Attraction, Activity)",
+    "description": "Detailed description",
+    "address": "Specific address in ${preferences.destination}",
+    "tags": ["tag1", "tag2", "tag3"],
+    "estimatedRating": 4.5
+  }
+]
 
-Format your response as practical travel advice.`;
+Only return valid JSON, no extra text.`;
 };
 
-// Get recommendations from Qloo API
+// Test Qloo API function
+export const testQlooAPI = async () => {
+  try {
+    console.log("Testing Qloo API...");
+    console.log(
+      "API Key:",
+      QLOO_API_KEY ? `${QLOO_API_KEY.substring(0, 10)}...` : "MISSING"
+    );
+
+    if (!QLOO_API_KEY) {
+      console.log("No Qloo API key found");
+      return false;
+    }
+
+    // Simple test request with a valid location
+    const response = await fetch(`${QLOO_API_BASE}/recommend`, {
+      method: "POST",
+      headers: getQlooHeaders(),
+      body: JSON.stringify({
+        input: {
+          geo_location: "New York", // Make sure this is not empty
+          category: ["restaurants"],
+          limit: 5,
+        },
+      }),
+    });
+
+    console.log("Response status:", response.status);
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log("API Test Success:", data);
+      return true;
+    } else {
+      const errorText = await response.text();
+      console.log("API Test Failed:", errorText);
+      return false;
+    }
+  } catch (error) {
+    console.error("API Test Error:", error);
+    return false;
+  }
+};
+
+// AI Enhanced Recommendations
+const getAIEnhancedRecommendations = async (
+  preferences: UserPreferences,
+  existingRecs: Recommendation[]
+): Promise<Recommendation[]> => {
+  console.log("=== AI Enhanced Recommendations ===");
+  console.log("OpenAI Key available:", !!OPENAI_API_KEY);
+
+  if (!OPENAI_API_KEY) {
+    console.log("No OpenAI key, using fallback");
+    return generateFallbackRecommendations(preferences);
+  }
+
+  const prompt = generateRecommendationPrompt(preferences);
+
+  try {
+    console.log("Trying OpenAI API...");
+    const result = await callOpenAIAPI(prompt);
+    if (result && result.length > 0) {
+      console.log("✅ Success with OpenAI");
+      return result;
+    }
+  } catch (error) {
+    console.log("❌ OpenAI failed:", error);
+  }
+
+  // Final fallback
+  console.log("All AI providers failed, using fallback recommendations");
+  return generateFallbackRecommendations(preferences);
+};
+
+// OpenAI API call with proper error handling
+const callOpenAIAPI = async (prompt: string): Promise<Recommendation[]> => {
+  if (!OPENAI_API_KEY) {
+    throw new Error("OpenAI API key not found");
+  }
+
+  console.log("Making OpenAI API call...");
+
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: getOpenAIHeaders(),
+      body: JSON.stringify({
+        model: "gpt-3.5-turbo",
+        messages: [
+          {
+            role: "system",
+            content: "You are a travel expert. Respond with valid JSON only.",
+          },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.7,
+        max_tokens: 1500,
+      }),
+    });
+
+    console.log("OpenAI Response Status:", response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.log("OpenAI Error Details:", errorText);
+      throw new Error(
+        `OpenAI API error: ${response.statusText} - ${errorText}`
+      );
+    }
+
+    const data = await response.json();
+    const content = data.choices[0]?.message?.content;
+    console.log("OpenAI Response Content:", content?.substring(0, 200) + "...");
+
+    return parseAIResponse(content);
+  } catch (error) {
+    console.error("OpenAI API call failed:", error);
+    throw error;
+  }
+};
+
+// Helper function to parse AI responses
+const parseAIResponse = (content: string): Recommendation[] => {
+  try {
+    if (!content) return [];
+
+    console.log("Parsing AI response...");
+
+    // Try to extract JSON from the response
+    const jsonMatch = content.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      const recommendations = JSON.parse(jsonMatch[0]);
+      return recommendations.map((rec: any, index: number) => ({
+        id: `ai-${Date.now()}-${index}`,
+        name: rec.name || "Unknown Location",
+        type: rec.type || "General",
+        image: "/placeholder.svg",
+        rating: rec.estimatedRating || rec.rating || 4.0,
+        address: rec.address || "Address not specified",
+        description: rec.description || "No description available",
+        tags: rec.tags || [rec.type || "General"],
+        price: "$$",
+      }));
+    }
+  } catch (error) {
+    console.error("Error parsing AI response:", error);
+  }
+  return [];
+};
+
+// Fallback recommendations
+const generateFallbackRecommendations = (
+  preferences: UserPreferences
+): Recommendation[] => {
+  console.log(
+    "Generating fallback recommendations for:",
+    preferences.destination
+  );
+
+  const fallbacks: Recommendation[] = [
+    {
+      id: "fallback-1",
+      name: `${preferences.destination} City Center`,
+      type: "Attraction",
+      image: "/placeholder.svg",
+      rating: 4.2,
+      address: `Downtown ${preferences.destination}`,
+      description:
+        "Historic city center with local attractions and dining options.",
+      tags: ["Historic", "Walking", "Cultural"],
+      price:
+        preferences.budget === "low"
+          ? "$"
+          : preferences.budget === "high"
+          ? "$$$"
+          : "$$",
+    },
+    {
+      id: "fallback-2",
+      name: `Local Food Market`,
+      type: "Food & Dining",
+      image: "/placeholder.svg",
+      rating: 4.5,
+      address: `Central Market, ${preferences.destination}`,
+      description:
+        "Traditional local market with authentic cuisine and fresh ingredients.",
+      tags: ["Food", "Local", "Authentic"],
+      price:
+        preferences.budget === "low"
+          ? "$"
+          : preferences.budget === "high"
+          ? "$$$"
+          : "$$",
+    },
+    {
+      id: "fallback-3",
+      name: `${preferences.destination} Museum`,
+      type: "Cultural",
+      image: "/placeholder.svg",
+      rating: 4.3,
+      address: `Museum District, ${preferences.destination}`,
+      description:
+        "Learn about local history and culture at this popular museum.",
+      tags: ["Culture", "Educational", "Indoor"],
+      price:
+        preferences.budget === "low"
+          ? "$"
+          : preferences.budget === "high"
+          ? "$$$"
+          : "$$",
+    },
+  ];
+
+  return fallbacks.slice(0, Math.max(2, preferences.numberOfDays));
+};
+
+// Main getRecommendations function
 export const getRecommendations = async (
   preferences: UserPreferences
 ): Promise<Recommendation[]> => {
+  console.log("=== Getting Recommendations ===");
+  console.log("Preferences:", preferences);
+
+  // Validate destination
+  if (!preferences.destination || preferences.destination.trim() === "") {
+    console.error("Empty destination provided");
+    return generateFallbackRecommendations(preferences);
+  }
+
   try {
+    // Check if we have a valid Qloo API key
+    if (!QLOO_API_KEY) {
+      console.warn("No Qloo API key found, falling back to AI recommendations");
+      return await getAIEnhancedRecommendations(preferences, []);
+    }
+
     // Map user interests to Qloo categories
     const categories = mapInterestsToQlooCategories(preferences.interests);
 
-    // Prepare Qloo API request
+    // Prepare Qloo API request - ENSURE DESTINATION IS NOT EMPTY
     const qlooRequestBody = {
       input: {
-        geo_location: preferences.destination,
+        geo_location: preferences.destination.trim(), // Make sure this is not empty
         category:
           categories.length > 0
             ? categories
             : ["restaurants", "attractions", "entertainment"],
-        limit: preferences.numberOfDays * 3, // 3 recommendations per day
+        limit: preferences.numberOfDays * 3,
       },
       filters: {
         budget_range:
@@ -130,6 +391,8 @@ export const getRecommendations = async (
       },
     };
 
+    console.log("Qloo Request:", JSON.stringify(qlooRequestBody, null, 2));
+
     // Call Qloo API for recommendations
     const qlooResponse = await fetch(`${QLOO_API_BASE}/recommend`, {
       method: "POST",
@@ -137,11 +400,17 @@ export const getRecommendations = async (
       body: JSON.stringify(qlooRequestBody),
     });
 
+    console.log("Qloo Response Status:", qlooResponse.status);
+
     if (!qlooResponse.ok) {
-      throw new Error(`Qloo API error: ${qlooResponse.statusText}`);
+      const errorText = await qlooResponse.text();
+      console.error("Qloo API Error Details:", errorText);
+      console.warn("Qloo API failed, falling back to AI recommendations");
+      return await getAIEnhancedRecommendations(preferences, []);
     }
 
     const qlooData = await qlooResponse.json();
+    console.log("Qloo Response Data:", qlooData);
 
     // Transform Qloo data to our format
     const recommendations: Recommendation[] =
@@ -178,253 +447,27 @@ export const getRecommendations = async (
     return recommendations;
   } catch (error) {
     console.error("Error fetching from Qloo API:", error);
-
-    // Fallback to AI-generated recommendations
     return await getAIEnhancedRecommendations(preferences, []);
   }
 };
 
-// Get AI-enhanced recommendations using OpenAI
-const getAIEnhancedRecommendations = async (
-  preferences: UserPreferences,
-  existingRecs: Recommendation[]
-): Promise<Recommendation[]> => {
-  try {
-    const prompt = `${generateRecommendationPrompt(preferences)}
-
-Please provide ${
-      preferences.numberOfDays * 2
-    } specific recommendations in this JSON format:
-[
-  {
-    "name": "Location Name",
-    "type": "Category (e.g., Restaurant, Attraction, Activity)",
-    "description": "Detailed description",
-    "address": "Specific address in ${preferences.destination}",
-    "tags": ["tag1", "tag2", "tag3"],
-    "estimatedRating": 4.5
-  }
-]
-
-Avoid duplicating these existing recommendations: ${existingRecs
-      .map((r) => r.name)
-      .join(", ")}`;
-
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: getOpenAIHeaders(),
-      body: JSON.stringify({
-        model: "gpt-4",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a knowledgeable travel expert. Provide accurate, helpful travel recommendations in the requested JSON format.",
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        temperature: 0.7,
-        max_tokens: 2000,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    const aiContent = data.choices[0]?.message?.content;
-
-    if (aiContent) {
-      try {
-        // Extract JSON from the response
-        const jsonMatch = aiContent.match(/\[[\s\S]*\]/);
-        if (jsonMatch) {
-          const aiRecommendations = JSON.parse(jsonMatch[0]);
-
-          return aiRecommendations.map((rec: any, index: number) => ({
-            id: `ai-${Date.now()}-${index}`,
-            name: rec.name,
-            type: rec.type,
-            image: "/placeholder.svg",
-            rating: rec.estimatedRating || 4.0,
-            address: rec.address,
-            description: rec.description,
-            tags: rec.tags || [rec.type],
-            price:
-              preferences.budget === "low"
-                ? "$"
-                : preferences.budget === "high"
-                ? "$$$"
-                : "$$",
-          }));
-        }
-      } catch (parseError) {
-        console.error("Error parsing AI response:", parseError);
-      }
-    }
-
-    // Fallback recommendations
-    return generateFallbackRecommendations(preferences);
-  } catch (error) {
-    console.error("Error getting AI recommendations:", error);
-    return generateFallbackRecommendations(preferences);
-  }
-};
-
-// Fallback recommendations in case of API failures
-const generateFallbackRecommendations = (
-  preferences: UserPreferences
-): Recommendation[] => {
-  const fallbacks: Recommendation[] = [
-    {
-      id: "fallback-1",
-      name: `${preferences.destination} City Center`,
-      type: "Attraction",
-      image: "/placeholder.svg",
-      rating: 4.2,
-      address: `Downtown ${preferences.destination}`,
-      description:
-        "Historic city center with local attractions and dining options.",
-      tags: ["Historic", "Walking", "Cultural"],
-      price:
-        preferences.budget === "low"
-          ? "$"
-          : preferences.budget === "high"
-          ? "$$$"
-          : "$$",
-    },
-    {
-      id: "fallback-2",
-      name: `Local Food Market`,
-      type: "Food & Dining",
-      image: "/placeholder.svg",
-      rating: 4.5,
-      address: `Central Market, ${preferences.destination}`,
-      description:
-        "Traditional local market with authentic cuisine and fresh ingredients.",
-      tags: ["Food", "Local", "Authentic"],
-      price:
-        preferences.budget === "low"
-          ? "$"
-          : preferences.budget === "high"
-          ? "$$$"
-          : "$$",
-    },
-  ];
-
-  return fallbacks.slice(0, preferences.numberOfDays);
-};
-
-// Create itinerary with AI assistance
+// Additional functions
 export const createItinerary = async (
   preferences: UserPreferences,
   selectedSpots: Recommendation[]
 ): Promise<Itinerary> => {
-  try {
-    // Use AI to optimize itinerary timing and order
-    const optimizedSpots = await optimizeItineraryWithAI(
-      preferences,
-      selectedSpots
-    );
-
-    return {
-      id: Date.now().toString(),
-      destination: preferences.destination,
-      totalDays: preferences.numberOfDays,
-      preferences,
-      spots: optimizedSpots,
-      createdAt: new Date().toISOString(),
-    };
-  } catch (error) {
-    console.error("Error creating itinerary:", error);
-
-    // Return basic itinerary without AI optimization
-    return {
-      id: Date.now().toString(),
-      destination: preferences.destination,
-      totalDays: preferences.numberOfDays,
-      preferences,
-      spots: selectedSpots,
-      createdAt: new Date().toISOString(),
-    };
-  }
+  return {
+    id: Date.now().toString(),
+    destination: preferences.destination,
+    totalDays: preferences.numberOfDays,
+    preferences,
+    spots: selectedSpots,
+    createdAt: new Date().toISOString(),
+  };
 };
 
-// AI-powered itinerary optimization
-const optimizeItineraryWithAI = async (
-  preferences: UserPreferences,
-  spots: Recommendation[]
-): Promise<Recommendation[]> => {
-  try {
-    const prompt = `Optimize this travel itinerary for ${
-      preferences.destination
-    }:
-    
-Trip Details:
-- Duration: ${preferences.numberOfDays} days
-- Budget: ${preferences.budget}
-- Travel Style: ${preferences.travelStyle}
-- Interests: ${preferences.interests.join(", ")}
-
-Selected Spots:
-${spots
-  .map((spot, i) => `${i + 1}. ${spot.name} (${spot.type}) - ${spot.address}`)
-  .join("\n")}
-
-Please provide:
-1. Optimal daily groupings based on location proximity
-2. Suggested timing for each activity
-3. Travel tips between locations
-4. Best order to visit for efficiency
-
-Return the spots in optimized order with any additional insights.`;
-
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: getOpenAIHeaders(),
-      body: JSON.stringify({
-        model: "gpt-3.5-turbo",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a travel optimization expert. Provide practical itinerary improvements.",
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        temperature: 0.5,
-        max_tokens: 1000,
-      }),
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      const optimization = data.choices[0]?.message?.content;
-
-      // For now, return original spots with AI insights added to descriptions
-      return spots.map((spot) => ({
-        ...spot,
-        description: `${spot.description} [AI Optimized]`,
-      }));
-    }
-  } catch (error) {
-    console.error("Error optimizing itinerary:", error);
-  }
-
-  return spots;
-};
-
-// Save itinerary (you might want to implement actual backend storage)
 export const saveItinerary = async (itinerary: Itinerary): Promise<boolean> => {
   try {
-    // Implement actual save logic here (database, cloud storage, etc.)
     localStorage.setItem(
       `itinerary-${itinerary.id}`,
       JSON.stringify(itinerary)
@@ -436,25 +479,12 @@ export const saveItinerary = async (itinerary: Itinerary): Promise<boolean> => {
   }
 };
 
-// Share itinerary functionality
 export const shareItinerary = async (
   itineraryId: string,
   email: string
 ): Promise<boolean> => {
   try {
-    // Implement actual sharing logic (email service, etc.)
     console.log(`Sharing itinerary ${itineraryId} with ${email}`);
-
-    // You could integrate with email services like SendGrid, Resend, etc.
-    const shareData = {
-      itineraryId,
-      email,
-      sharedAt: new Date().toISOString(),
-    };
-
-    // For now, just log the sharing attempt
-    localStorage.setItem(`share-${Date.now()}`, JSON.stringify(shareData));
-
     return true;
   } catch (error) {
     console.error("Error sharing itinerary:", error);
@@ -462,56 +492,7 @@ export const shareItinerary = async (
   }
 };
 
-// Get travel tips using AI
 export const getTravelTips = async (destination: string): Promise<string[]> => {
-  try {
-    const prompt = `Provide 6 essential travel tips for visiting ${destination}. Include practical advice about:
-    1. Transportation
-    2. Local customs
-    3. Safety
-    4. Money/payments
-    5. Communication
-    6. Hidden gems
-
-    Format as a simple list of tips.`;
-
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: getOpenAIHeaders(),
-      body: JSON.stringify({
-        model: "gpt-3.5-turbo",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a knowledgeable travel expert. Provide practical, actionable travel advice.",
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        temperature: 0.7,
-        max_tokens: 800,
-      }),
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      const content = data.choices[0]?.message?.content;
-
-      if (content) {
-        // Split response into individual tips
-        return content
-          .split("\n")
-          .filter((tip: string) => tip.trim().length > 0);
-      }
-    }
-  } catch (error) {
-    console.error("Error getting travel tips:", error);
-  }
-
-  // Fallback tips
   return [
     "Research local customs and etiquette before your trip",
     "Download offline maps and translation apps",
