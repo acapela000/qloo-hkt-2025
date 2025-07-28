@@ -13,6 +13,7 @@ import UserPreferencesForm from "./userPreferencesForm";
 import SpotCard from "./spotCard";
 import ItineraryDisplay from "./itineraryDisplay";
 import TravelTips from "./travelTips";
+import { clientGetTravelTips } from "@/services/ClientApiService";
 
 // Types
 interface ItineraryDay {
@@ -140,6 +141,18 @@ export default function TravelItineraryApp() {
       tags: ["Nature", "Photography", "Peaceful"],
     },
   ];
+
+  //call clientGetTravelTips
+  const getTravelTips = async () => {
+    try {
+      const tips = await clientGetTravelTips(sampleItinerary.destination);
+      console.log("Travel Tips:", tips);
+      return tips;
+    } catch (error) {
+      console.error("Error fetching travel tips:", error);
+      return [];
+    }
+  };
 
   return (
     <MainLayout>

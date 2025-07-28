@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   MapPin,
   Clock,
@@ -29,7 +29,11 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { type Activity } from "../services/QlooApiService";
+import {
+  Recommendation,
+  UserPreferences,
+  type Activity,
+} from "@/services/QlooApiService";
 
 // Types
 interface ItineraryDay {
@@ -53,6 +57,13 @@ interface ItineraryDisplayProps {
 const ItineraryDisplay: React.FC<ItineraryDisplayProps> = ({ itinerary }) => {
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
+
+  // State to manage export status
+  // "idle" | "loading" | "success" | "error"
+  // "idle" means no export in progress
+  // "loading" means export is in progress
+  // "success" means export completed successfully
+  // "error" means export failed
   const [exportStatus, setExportStatus] = useState<
     "idle" | "loading" | "success" | "error"
   >("idle");
@@ -80,7 +91,62 @@ const ItineraryDisplay: React.FC<ItineraryDisplayProps> = ({ itinerary }) => {
   const copyLink = () => {
     navigator.clipboard.writeText(window.location.href);
     // Could add toast notification here
+    console.log("Link copied to clipboard:", window.location.href);
+    setShareModalOpen(false);
+    setShareEmail("");
+    setExportModalOpen(false);
+    setExportStatus("idle");
   };
+
+  // call clientGetItinerary function to fetch itinerary data POST request
+  // body of the post is: { preferences, selectedSpots }
+  const fetchItinerary = async (
+    preferences: UserPreferences,
+    selectedSpots: Recommendation[]
+  ) => {
+    try {
+      const response = await fetch("/api/itinerary", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ preferences, selectedSpots }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch itinerary");
+      }
+
+      const data = await response.json();
+      return data.itinerary;
+    } catch (error) {
+      console.error("Error fetching itinerary:", error);
+      throw error;
+    }
+  };
+
+  useEffect(() => {
+    // Fetch itinerary with fetchItinerary function
+    const getItinerary = async () => {
+      try {
+        const preferences: UserPreferences = {
+          destination: "Sample Destination",
+          numberOfDays: 5,
+          budget: "medium",
+          travelStyle: "solo",
+          interests: ["Nature", "Culture"],
+        }; // Define preferences object or fetch it from props/state
+        const selectedSpots: Recommendation[] = []; // Define selectedSpots array or fetch it from props/state
+        const itineraryData = await fetchItinerary(preferences, selectedSpots);
+        // Update state with fetched itinerary data
+        console.log("Fetched Itinerary:", itineraryData);
+      } catch (error) {
+        console.error("Error fetching itinerary:", error);
+      }
+    };
+
+    getItinerary();
+  }, [itinerary.id]);
 
   return (
     <div className="space-y-6">
@@ -247,3 +313,6 @@ const ItineraryDisplay: React.FC<ItineraryDisplayProps> = ({ itinerary }) => {
 };
 
 export default ItineraryDisplay;
+function clientGetItinerary(id: string) {
+  throw new Error("Function not implemented.");
+}

@@ -27,6 +27,7 @@ import {
   getRecommendations,
   type UserPreferences,
 } from "../services/QlooApiService";
+import { clientGetRecommendations } from "@/services/ClientApiService";
 
 // UserPreferencesForm Component
 const UserPreferencesForm: React.FC = () => {
@@ -99,11 +100,36 @@ const UserPreferencesForm: React.FC = () => {
 
   const handleSubmit = async () => {
     try {
-      const recommendations = await getRecommendations(preferences);
-      console.log("Recommendations:", recommendations);
-      // Handle successful submission
+      console.log("=== Form Submit ===");
+      console.log("Current preferences:", preferences);
+
+      // Validate before sending
+      if (!preferences.destination?.trim()) {
+        alert("Please enter a destination");
+        return;
+      }
+
+      if (!preferences.numberOfDays || preferences.numberOfDays < 1) {
+        alert("Please enter number of days");
+        return;
+      }
+
+      // Show loading state
+      setIsLoading(true);
+
+      const recommendations = await clientGetRecommendations(preferences);
+      console.log("✅ Successfully received recommendations:", recommendations);
+
+      // Handle success (update state, navigate, etc.)
     } catch (error) {
-      console.error("Error getting recommendations:", error);
+      console.error("❌ Error in form submit:", error);
+      alert(
+        `Error: ${
+          error instanceof Error ? error.message : "Unknown error occurred"
+        }`
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -304,3 +330,6 @@ const UserPreferencesForm: React.FC = () => {
 };
 
 export default UserPreferencesForm;
+function setIsLoading(arg0: boolean) {
+  throw new Error("Function not implemented.");
+}
