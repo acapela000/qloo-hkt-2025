@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { testQlooAPI } from "@/services/QlooApiService";
+import { testQlooInsightsAPI } from "@/services/QlooApiService";
 
 // export async function GET() {
 //   try {
