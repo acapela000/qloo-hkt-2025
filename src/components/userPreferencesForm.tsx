@@ -10,6 +10,7 @@ import {
   Mountain,
   ShoppingBag,
   Heart,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,15 +24,24 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
-import {
-  getRecommendations,
-  type UserPreferences,
-} from "../services/QlooApiService";
 import { clientGetRecommendations } from "@/services/ClientApiService";
+import type {
+  UserPreferences,
+  Recommendation,
+} from "@/services/QlooApiService";
 
-// UserPreferencesForm Component
-const UserPreferencesForm: React.FC = () => {
+interface UserPreferencesFormProps {
+  onRecommendationsReceived?: (
+    recommendations: Recommendation[],
+    preferences: UserPreferences
+  ) => void;
+}
+
+const UserPreferencesForm: React.FC<UserPreferencesFormProps> = ({
+  onRecommendationsReceived,
+}) => {
   const [currentStep, setCurrentStep] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
   const [preferences, setPreferences] = useState<UserPreferences>({
     destination: "",
     numberOfDays: 1,
@@ -100,8 +110,8 @@ const UserPreferencesForm: React.FC = () => {
 
   const handleSubmit = async () => {
     try {
-      console.log("=== Form Submit ===");
-      console.log("Current preferences:", preferences);
+      console.log("=== Form Submit Debug ===");
+      console.log("Current preferences state:", preferences);
 
       // Validate before sending
       if (!preferences.destination?.trim()) {
@@ -114,25 +124,41 @@ const UserPreferencesForm: React.FC = () => {
         return;
       }
 
-      // Show loading state
+      if (!preferences.interests || preferences.interests.length === 0) {
+        alert("Please select at least one interest");
+        return;
+      }
+
+      console.log("✅ Client validation passed");
+
       setIsLoading(true);
 
+      console.log("Making API call...");
       const recommendations = await clientGetRecommendations(preferences);
-      console.log("✅ Successfully received recommendations:", recommendations);
+      console.log("✅ API call successful, recommendations:", recommendations);
 
-      // Handle success (update state, navigate, etc.)
+      // Pass results to parent component
+      if (onRecommendationsReceived && recommendations.length > 0) {
+        onRecommendationsReceived(recommendations, preferences);
+      } else {
+        alert(
+          `Generated ${recommendations.length} recommendations! Check console for details.`
+        );
+      }
     } catch (error) {
-      console.error("❌ Error in form submit:", error);
-      alert(
-        `Error: ${
-          error instanceof Error ? error.message : "Unknown error occurred"
-        }`
-      );
+      console.error("❌ Form submit error:", error);
+
+      if (error instanceof Error) {
+        alert(`Error: ${error.message}`);
+      } else {
+        alert("An unknown error occurred");
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
+  // ...existing renderStep() method stays the same...
   const renderStep = () => {
     switch (currentStep) {
       case 1:
@@ -313,15 +339,26 @@ const UserPreferencesForm: React.FC = () => {
           <Button
             variant="outline"
             onClick={handlePrevious}
-            disabled={currentStep === 1}
+            disabled={currentStep === 1 || isLoading}
           >
             Previous
           </Button>
 
           {currentStep === totalSteps ? (
-            <Button onClick={handleSubmit}>Create Itinerary</Button>
+            <Button onClick={handleSubmit} disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                "Create Itinerary"
+              )}
+            </Button>
           ) : (
-            <Button onClick={handleNext}>Next</Button>
+            <Button onClick={handleNext} disabled={isLoading}>
+              Next
+            </Button>
           )}
         </div>
       </CardContent>
@@ -330,6 +367,3 @@ const UserPreferencesForm: React.FC = () => {
 };
 
 export default UserPreferencesForm;
-function setIsLoading(arg0: boolean) {
-  throw new Error("Function not implemented.");
-}
