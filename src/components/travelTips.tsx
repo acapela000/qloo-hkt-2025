@@ -1,6 +1,6 @@
 "use client";
 
-import type React from "react";
+import React from "react";
 import {
   Camera,
   Lightbulb,
@@ -67,31 +67,34 @@ const TravelTips: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900">Travel Tips</h2>
-        <p className="text-gray-600 mt-2">
-          Essential advice for a smooth journey
-        </p>
-      </div>
+    <div>
+      <div className="space-y-6">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900">Travel Tips</h2>
+          <p className="text-gray-600 mt-2">
+            Essential advice for a smooth journey
+          </p>
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {tips.map((tip) => (
-          <Card key={tip.id} className="hover:shadow-md transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex items-start space-x-4">
-                <div className="flex-shrink-0">{tip.icon}</div>
-                <div>
-                  <h3 className="font-semibold text-lg mb-2">{tip.title}</h3>
-                  <p className="text-gray-600 text-sm">{tip.description}</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {tips.map((tip) => (
+            <Card key={tip.id} className="hover:shadow-md transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-start space-x-4">
+                  <div className="flex-shrink-0">{tip.icon}</div>
+                  <div>
+                    <h3 className="font-semibold text-lg mb-2">{tip.title}</h3>
+                    <p className="text-gray-600 text-sm">{tip.description}</p>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     </div>
   );
 };
 
+// Make sure to export as default
 export default TravelTips;
