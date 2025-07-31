@@ -1,22 +1,14 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useSearchResults } from "@/hooks/useSearchResults";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import {
-  Search,
-  MapPin,
-  Loader2,
-  AlertCircle,
-  CheckCircle,
-  XCircle,
-  Palette,
-} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Loader2, Search, MapPin, X } from "lucide-react";
 import SpotCard from "./SpotCard";
-import QlooApiService, { type Recommendation } from "@/services/QlooApiService";
-import { useSearchHistory } from "@/hooks/useSearchHistory";
+import { QlooApiService, type Recommendation } from "@/services/QlooApiService";
 
 interface TravelItineraryAppProps {
   onAddToItinerary?: (item: any, itineraryId?: string) => void;
@@ -25,39 +17,50 @@ interface TravelItineraryAppProps {
 const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
   onAddToItinerary,
 }) => {
-  const [destination, setDestination] = useState("");
-  const [preferences, setPreferences] = useState("");
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  // Use the global search state
+  const { searchState, updateSearchResults, clearSearchResults, hasResults } =
+    useSearchResults();
+
+  // Local state that syncs with global state
+  const [destination, setDestination] = useState(searchState.destination);
+  const [preferences, setPreferences] = useState(searchState.preferences);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(
+    searchState.selectedCategories
+  );
+  const [recommendations, setRecommendations] = useState<Recommendation[]>(
+    searchState.recommendations
+  );
+
+  // Other local state
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [apiStatus, setApiStatus] = useState<
-    "checking" | "connected" | "error"
-  >("checking");
   const itemsPerPage = 9;
 
-  const { addSearchToHistory } = useSearchHistory();
-
-  // Test API connection on component mount
+  // Restore state on mount
   useEffect(() => {
-    const testApiConnection = async () => {
-      try {
-        const response = await fetch("/api/qloo");
-        if (response.ok) {
-          const data = await response.json();
-          console.log("API Status:", data);
-          setApiStatus("connected");
-        } else {
-          setApiStatus("error");
-        }
-      } catch (error) {
-        console.error("API connection test failed:", error);
-        setApiStatus("error");
-      }
-    };
+    if (hasResults) {
+      setDestination(searchState.destination);
+      setPreferences(searchState.preferences);
+      setSelectedCategories(searchState.selectedCategories);
+      setRecommendations(searchState.recommendations);
+    }
+  }, [searchState, hasResults]);
 
-    testApiConnection();
-  }, []);
+  // Updated categories array
+  const categories = [
+    "restaurants",
+    "hotels",
+    "attractions",
+    "museums",
+    "parks",
+    "entertainment",
+    "shopping",
+    "cafes",
+    "food",
+    "history",
+    "culture",
+  ];
 
   const handleSearch = async () => {
     if (!destination.trim()) {
@@ -69,196 +72,348 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
     setError(null);
 
     try {
-      console.log("🔍 Starting REAL Qloo API search for:", destination);
-
-      const qlooService = new QlooApiService();
-      const results = await qlooService.getRecommendations(
+      console.log("Starting search with:", {
         destination,
         preferences,
+        selectedCategories,
+      });
+
+      // Build search query with categories
+      let searchQuery = destination;
+      if (preferences.trim()) {
+        searchQuery += ` ${preferences}`;
+      }
+      if (selectedCategories.length > 0) {
+        searchQuery += ` ${selectedCategories.join(" ")}`;
+      }
+
+      console.log("Final search query:", searchQuery);
+
+      // Call Qloo API with enhanced query
+      const results = await qlooService.getRecommendations(
+        searchQuery, // Use enhanced query
+        preferences,
         {
-          limit: 0, // Setting limit to 0 to indicate no limit
+          limit: 20, // Get more results
           page: 1,
+          categories: selectedCategories, // Pass categories if your service supports it
         }
       );
 
-      console.log(
-        "✅ Real Qloo API returned",
-        results.length,
-        "recommendations"
+      console.log("Search results received:", results.length, "items");
+
+      setRecommendations(results);
+      // Update global state
+      updateSearchResults(
+        destination,
+        preferences,
+        selectedCategories,
+        results
       );
+      setCurrentPage(1);
 
       if (results.length === 0) {
         setError(
-          `No recommendations found for "${destination}" from Qloo API. Try a different destination.`
+          "No recommendations found. Try different preferences or destination."
         );
-        return;
       }
-
-      setRecommendations(results);
-      setCurrentPage(1);
-
-      addSearchToHistory(
-        `${destination} ${preferences}`.trim(),
-        results.length,
-        { destination, preferences },
-        destination,
-        "travel"
-      );
-
-      console.log(
-        `🎉 Successfully processed ${results.length} real recommendations from Qloo`
-      );
     } catch (err) {
-      console.error("❌ Real Qloo API Error:", err);
+      console.error("Search error:", err);
       setError(
-        `Qloo API Error: ${
-          err instanceof Error ? err.message : "Unknown error"
-        }`
+        err instanceof Error ? err.message : "Failed to get recommendations"
       );
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleSearch();
-    }
+  const handleClearResults = () => {
+    clearSearchResults();
+    setDestination("");
+    setPreferences("");
+    setSelectedCategories([]);
+    setRecommendations([]);
+    setCurrentPage(1);
+    setError(null);
   };
 
-  // Pagination logic
-  const totalPages = Math.ceil(recommendations.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const currentRecommendations = recommendations.slice(
-    startIndex,
-    startIndex + itemsPerPage
+  const toggleCategory = (category: string) => {
+    setSelectedCategories((prev) =>
+      prev.includes(category)
+        ? prev.filter((c) => c !== category)
+        : [...prev, category]
+    );
+  };
+
+  const paginatedRecommendations = recommendations.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const getStatusIcon = () => {
-    switch (apiStatus) {
-      case "checking":
-        return <Loader2 className="h-4 w-4 animate-spin text-accent-400" />;
-      case "connected":
-        return <CheckCircle className="h-4 w-4 text-primary-500" />;
-      case "error":
-        return <XCircle className="h-4 w-4 text-red-500" />;
-    }
-  };
-
-  const getStatusText = () => {
-    switch (apiStatus) {
-      case "checking":
-        return "Checking API...";
-      case "connected":
-        return "API Ready";
-      case "error":
-        return "API Error";
-    }
-  };
+  const totalPages = Math.ceil(recommendations.length / itemsPerPage);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-secondary-50 to-accent-50 py-8">
-      <div className="container mx-auto px-6 space-y-8">
-        {/* API Status Indicator */}
-        <div className="flex justify-end">
-          <Badge
-            variant="outline"
-            className="flex items-center space-x-2 border-primary-200 bg-white/80 backdrop-blur-sm"
-          >
-            {getStatusIcon()}
-            <span className="text-earth-700">{getStatusText()}</span>
-          </Badge>
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-secondary-50 to-accent-50 py-4 sm:py-6 lg:py-8">
+      <div className="container mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 space-y-4 sm:space-y-6 lg:space-y-8">
+        {/* Header with Clear Button */}
+        <div className="text-center space-y-2 sm:space-y-4">
+          <div className="flex justify-between items-center">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-800">
+              AI Travel Discovery
+            </h1>
+            {hasResults && (
+              <Button
+                onClick={handleClearResults}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+              >
+                <X className="w-4 h-4" />
+                Clear Results
+              </Button>
+            )}
+          </div>
+          <p className="text-sm sm:text-base text-gray-600 max-w-2xl mx-auto">
+            Discover amazing places powered by Qloo's AI recommendations
+          </p>
         </div>
 
-        {/* Search Section */}
-        <Card className="van-gogh-card border-2 border-primary-200/50 shadow-xl">
-          <CardHeader className="bg-van-gogh-gradient text-white rounded-t-xl">
-            <div className="flex items-center justify-center mb-4">
-              <Palette className="h-8 w-8 mr-3 animate-float" />
-              <CardTitle className="text-3xl font-display font-bold text-center">
-                Paint Your Perfect Journey
-              </CardTitle>
-            </div>
-            <p className="text-white/90 text-center text-lg">
-              Discover destinations with the artistic eye of Van Gogh's cultural
-              intelligence
-            </p>
+        {/* Search Form */}
+        <Card className="border-2 border-primary-200 shadow-lg">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
+              <Search className="w-5 h-5 text-primary-600" />
+              Plan Your Journey
+            </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6 p-8 bg-gradient-to-br from-white/95 to-primary-50/50">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-semibold mb-3 text-secondary-700 flex items-center">
-                  <MapPin className="h-4 w-4 mr-2 text-primary-400" />
-                  Destination
-                </label>
+          <CardContent className="space-y-4">
+            {/* Destination Input */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">
+                Where do you want to go? *
+              </label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <Input
-                  placeholder="e.g., Paris, Tokyo, New York"
+                  type="text"
+                  placeholder="e.g., Paris, Tokyo, New York..."
                   value={destination}
                   onChange={(e) => setDestination(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  className="input w-full text-lg py-3 border-2 border-primary-200 focus:border-primary-400 focus:ring-primary-400 bg-white/90"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold mb-3 text-secondary-700 flex items-center">
-                  <Palette className="h-4 w-4 mr-2 text-accent-400" />
-                  Artistic Preferences (Optional)
-                </label>
-                <Input
-                  placeholder="e.g., art galleries, historic cafes, scenic spots"
-                  value={preferences}
-                  onChange={(e) => setPreferences(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  className="input w-full text-lg py-3 border-2 border-primary-200 focus:border-primary-400 focus:ring-primary-400 bg-white/90"
+                  className="pl-10 h-12 text-base"
                 />
               </div>
             </div>
 
-            <div className="text-center">
-              <Button
-                onClick={handleSearch}
-                disabled={
-                  isLoading || !destination.trim() || apiStatus === "error"
-                }
-                className="btn-primary px-10 py-4 text-lg font-semibold group"
-                size="lg"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-3 h-6 w-6 animate-spin" />
-                    Creating Your Masterpiece...
-                  </>
-                ) : (
-                  <>
-                    <Search className="mr-3 h-6 w-6 group-hover:scale-110 transition-transform" />
-                    Discover Artistic Places
-                  </>
-                )}
-              </Button>
+            {/* Preferences Input */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">
+                What are you looking for?
+              </label>
+              <textarea
+                placeholder="e.g., romantic restaurants, family-friendly activities, cultural experiences..."
+                value={preferences}
+                onChange={(e) => setPreferences(e.target.value)}
+                className="w-full min-h-[80px] p-3 border border-gray-300 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
             </div>
 
-            {error && (
-              <div className="text-red-700 text-center p-6 bg-red-50 rounded-xl border-2 border-red-200 flex items-center justify-center space-x-3 shadow-lg">
-                <AlertCircle className="h-6 w-6 flex-shrink-0" />
-                <span className="font-medium">{error}</span>
-              </div>
-            )}
+            {/* Categories */}
+            <div className="space-y-3">
+              <label className="text-sm font-medium text-gray-700">
+                Categories (optional)
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {[
+                  {
+                    id: "restaurants",
+                    label: "Restaurant",
+                    icon: "🍽️",
+                    color: "bg-purple-50 border-purple-200",
+                  },
+                  {
+                    id: "hotels",
+                    label: "Hotel",
+                    icon: "🏨",
+                    color: "bg-red-50 border-red-200",
+                  },
+                  {
+                    id: "attractions",
+                    label: "Attraction",
+                    icon: "🎯",
+                    color: "bg-blue-50 border-blue-200",
+                  },
+                  {
+                    id: "museums",
+                    label: "Museum",
+                    icon: "🏛️",
+                    color: "bg-gray-50 border-gray-200",
+                  },
+                  {
+                    id: "parks",
+                    label: "Park",
+                    icon: "🌲",
+                    color: "bg-green-50 border-green-200",
+                  },
+                  {
+                    id: "entertainment",
+                    label: "Entertainment",
+                    icon: "🎭",
+                    color: "bg-orange-50 border-orange-200",
+                  },
+                  {
+                    id: "shopping",
+                    label: "Shopping",
+                    icon: "🛍️",
+                    color: "bg-blue-50 border-blue-200",
+                  },
+                  {
+                    id: "cafes",
+                    label: "Cafe",
+                    icon: "☕",
+                    color: "bg-brown-50 border-brown-200",
+                  },
+                  {
+                    id: "food",
+                    label: "Food",
+                    icon: "🍕",
+                    color: "bg-orange-50 border-orange-200",
+                  },
+                  {
+                    id: "history",
+                    label: "History",
+                    icon: "📚",
+                    color: "bg-indigo-50 border-indigo-200",
+                  },
+                  {
+                    id: "culture",
+                    label: "Culture",
+                    icon: "🎨",
+                    color: "bg-pink-50 border-pink-200",
+                  },
+                ].map((category) => (
+                  <label
+                    key={category.id}
+                    className={`
+                      relative flex items-center space-x-3 p-4 rounded-xl cursor-pointer transition-all duration-200 border-2
+                      ${
+                        selectedCategories.includes(category.id)
+                          ? "bg-blue-50 border-blue-400 shadow-md transform scale-[1.02]"
+                          : `${category.color} hover:shadow-sm hover:transform hover:scale-[1.01]`
+                      }
+                    `}
+                  >
+                    {/* Custom Checkbox */}
+                    <div className="relative">
+                      <input
+                        type="checkbox"
+                        checked={selectedCategories.includes(category.id)}
+                        onChange={() => toggleCategory(category.id)}
+                        className="sr-only" // Hide the default checkbox
+                      />
+                      <div
+                        className={`
+                        w-5 h-5 rounded border-2 flex items-center justify-center transition-all duration-200
+                        ${
+                          selectedCategories.includes(category.id)
+                            ? "bg-blue-500 border-blue-500"
+                            : "bg-white border-gray-300"
+                        }
+                      `}
+                      >
+                        {selectedCategories.includes(category.id) && (
+                          <svg
+                            className="w-3 h-3 text-white"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                        )}
+                      </div>
+                    </div>
 
-            {apiStatus === "error" && (
-              <div className="text-accent-700 text-center p-6 bg-accent-50 rounded-xl border-2 border-accent-200 shadow-lg">
-                <div className="flex items-center justify-center space-x-3 mb-2">
-                  <AlertCircle className="h-6 w-6" />
-                  <span className="font-semibold">API Connection Issue</span>
+                    {/* Icon */}
+                    <span className="text-xl">{category.icon}</span>
+
+                    {/* Label */}
+                    <span
+                      className={`text-sm font-medium ${
+                        selectedCategories.includes(category.id)
+                          ? "text-blue-800"
+                          : "text-gray-700"
+                      }`}
+                    >
+                      {category.label}
+                    </span>
+                  </label>
+                ))}
+              </div>
+
+              {/* Selected Categories Display */}
+              {selectedCategories.length > 0 && (
+                <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex flex-wrap gap-2">
+                    {selectedCategories.map((categoryId) => {
+                      const category = [
+                        { id: "restaurants", label: "Restaurant", icon: "🍽️" },
+                        { id: "hotels", label: "Hotel", icon: "🏨" },
+                        { id: "attractions", label: "Attraction", icon: "🎯" },
+                        { id: "museums", label: "Museum", icon: "🏛️" },
+                        { id: "parks", label: "Park", icon: "🌲" },
+                        {
+                          id: "entertainment",
+                          label: "Entertainment",
+                          icon: "🎭",
+                        },
+                        { id: "shopping", label: "Shopping", icon: "🛍️" },
+                        { id: "cafes", label: "Cafe", icon: "☕" },
+                        { id: "food", label: "Food", icon: "🍕" },
+                        { id: "history", label: "History", icon: "📚" },
+                        { id: "culture", label: "Culture", icon: "🎨" },
+                      ].find((cat) => cat.id === categoryId);
+
+                      return category ? (
+                        <span
+                          key={categoryId}
+                          className="inline-flex items-center gap-1 px-2 py-1 bg-white rounded-md text-sm font-medium text-blue-800 border border-blue-300"
+                        >
+                          <span>{category.icon}</span>
+                          <span>{category.label}</span>
+                        </span>
+                      ) : null;
+                    })}
+                  </div>
                 </div>
-                <p className="text-sm">
-                  Please refresh the page or contact support if the problem
-                  persists.
-                </p>
+              )}
+            </div>
+
+            {/* Search Button */}
+            <Button
+              onClick={handleSearch}
+              disabled={isLoading || !destination.trim()}
+              className="w-full h-12 text-base font-medium"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Searching...
+                </>
+              ) : (
+                <>
+                  <Search className="w-4 h-4 mr-2" />
+                  Find Recommendations
+                </>
+              )}
+            </Button>
+
+            {/* Error Message */}
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-700">{error}</p>
               </div>
             )}
           </CardContent>
@@ -266,33 +421,21 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
 
         {/* Results Section */}
         {recommendations.length > 0 && (
-          <div className="space-y-8">
-            {/* Results Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div className="van-gogh-card p-6 flex-1">
-                <h2 className="text-3xl font-display font-bold text-secondary-700 mb-2">
-                  Artistic Discoveries in{" "}
-                  <span className="van-gogh-text">{destination}</span>
-                </h2>
-                <p className="text-earth-600 text-lg">
-                  Showing {startIndex + 1}-
-                  {Math.min(startIndex + itemsPerPage, recommendations.length)}{" "}
-                  of {recommendations.length} curated places
-                </p>
+          <div className="space-y-4 sm:space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
+                Recommendations for {destination}
+              </h2>
+              <div className="text-sm text-gray-600">
+                {recommendations.length} places found
               </div>
-              <Badge
-                variant="secondary"
-                className="bg-primary-100 text-primary-700 px-4 py-2 text-lg font-medium border border-primary-200"
-              >
-                Canvas {currentPage} of {totalPages}
-              </Badge>
             </div>
 
-            {/* Recommendations Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {currentRecommendations.map((recommendation) => (
+            {/* Results Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {paginatedRecommendations.map((recommendation) => (
                 <SpotCard
-                  key={`${recommendation.id}-${currentPage}`}
+                  key={recommendation.id}
                   spot={recommendation}
                   onAddToItinerary={onAddToItinerary}
                 />
@@ -301,106 +444,34 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex justify-center items-center space-x-3 py-8">
+              <div className="flex justify-center items-center space-x-2">
                 <Button
-                  variant="outline"
-                  onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className="van-gogh-button-outline"
-                >
-                  Previous Canvas
-                </Button>
-
-                <div className="flex space-x-2">
-                  {Array.from(
-                    { length: Math.min(5, totalPages) },
-                    (_, index) => {
-                      let pageNum;
-                      if (totalPages <= 5) {
-                        pageNum = index + 1;
-                      } else if (currentPage <= 3) {
-                        pageNum = index + 1;
-                      } else if (currentPage >= totalPages - 2) {
-                        pageNum = totalPages - 4 + index;
-                      } else {
-                        pageNum = currentPage - 2 + index;
-                      }
-
-                      return (
-                        <Button
-                          key={pageNum}
-                          variant={
-                            currentPage === pageNum ? "default" : "outline"
-                          }
-                          onClick={() => handlePageChange(pageNum)}
-                          className={
-                            currentPage === pageNum
-                              ? "van-gogh-button"
-                              : "van-gogh-button-outline"
-                          }
-                          size="sm"
-                        >
-                          {pageNum}
-                        </Button>
-                      );
-                    }
-                  )}
-                </div>
-
-                <Button
                   variant="outline"
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                  className="van-gogh-button-outline"
+                  size="sm"
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.max(1, prev - 1))
+                  }
                 >
-                  Next Canvas
+                  Previous
+                </Button>
+                <span className="text-sm text-gray-600">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  disabled={currentPage === totalPages}
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                  }
+                >
+                  Next
                 </Button>
               </div>
             )}
           </div>
         )}
-
-        {/* Getting Started State */}
-        {!isLoading &&
-          recommendations.length === 0 &&
-          !destination &&
-          !error && (
-            <div className="text-center py-20">
-              <div className="van-gogh-card max-w-2xl mx-auto p-12">
-                <div className="w-32 h-32 bg-van-gogh-gradient rounded-full flex items-center justify-center mx-auto mb-8 animate-float">
-                  <Palette className="h-16 w-16 text-white" />
-                </div>
-                <h3 className="text-4xl font-display font-bold text-secondary-700 mb-6">
-                  Ready to Create Your{" "}
-                  <span className="van-gogh-text">Masterpiece</span>?
-                </h3>
-                <p className="text-earth-600 text-xl mb-10 leading-relaxed">
-                  Enter a destination above to discover amazing places that
-                  would inspire even the greatest artists.
-                </p>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {[
-                    { city: "Paris", emoji: "🎨" },
-                    { city: "Tokyo", emoji: "🏮" },
-                    { city: "New York", emoji: "🗽" },
-                    { city: "London", emoji: "🎭" },
-                  ].map(({ city, emoji }) => (
-                    <Button
-                      key={city}
-                      variant="outline"
-                      onClick={() => setDestination(city)}
-                      className="van-gogh-button-outline p-4 text-lg group hover:scale-105 transition-all duration-300"
-                    >
-                      <span className="text-2xl mr-2 group-hover:animate-bounce">
-                        {emoji}
-                      </span>
-                      {city}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
       </div>
     </div>
   );
