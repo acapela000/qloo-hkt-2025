@@ -99,3 +99,14 @@ export const useSearchResults = () => {
     hasResults: searchState.recommendations.length > 0,
   };
 };
+
+// Add debugging in this hook to see if it's overriding your data
+export const useDebugSearchResults = () => {
+  const { searchState } = useSearchResults();
+
+  useEffect(() => {
+    console.log("Current search state:", JSON.stringify(searchState, null, 2));
+  }, [searchState]);
+
+  return searchState;
+};
