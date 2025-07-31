@@ -6,22 +6,37 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Search, MapPin, X } from "lucide-react";
+import {
+  Loader2,
+  Search,
+  MapPin,
+  X,
+  Menu,
+  Home,
+  Heart,
+  BarChart3,
+  User,
+} from "lucide-react";
 import SpotCard from "./SpotCard";
-import { QlooApiService, type Recommendation } from "@/services/QlooApiService";
+import qlooService, {
+  QlooApiService,
+  type Recommendation,
+} from "@/services/QlooApiService";
 
 interface TravelItineraryAppProps {
   onAddToItinerary?: (item: any, itineraryId?: string) => void;
+  onTabChange?: (tab: string) => void;
+  hideMobileNav?: boolean; // Add this prop
 }
 
 const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
   onAddToItinerary,
+  onTabChange,
+  hideMobileNav = false, // Default to false
 }) => {
-  // Use the global search state
   const { searchState, updateSearchResults, clearSearchResults, hasResults } =
     useSearchResults();
 
-  // Local state that syncs with global state
   const [destination, setDestination] = useState(searchState.destination);
   const [preferences, setPreferences] = useState(searchState.preferences);
   const [selectedCategories, setSelectedCategories] = useState<string[]>(
@@ -31,13 +46,12 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
     searchState.recommendations
   );
 
-  // Other local state
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const itemsPerPage = 9;
 
-  // Restore state on mount
   useEffect(() => {
     if (hasResults) {
       setDestination(searchState.destination);
@@ -47,7 +61,6 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
     }
   }, [searchState, hasResults]);
 
-  // Updated categories array
   const categories = [
     "restaurants",
     "hotels",
@@ -72,38 +85,23 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
     setError(null);
 
     try {
-      console.log("Starting search with:", {
-        destination,
-        preferences,
-        selectedCategories,
-      });
+      const userPreferences = {
+        destination: destination.trim(),
+        preferences: preferences.trim(),
+        selectedCategories: selectedCategories,
+        numberOfDays: 3,
+        budget: "medium" as const,
+        travelStyle: "solo" as const,
+        interests:
+          selectedCategories.length > 0 ? selectedCategories : ["general"],
+        departureDate: undefined,
+      };
 
-      // Build search query with categories
-      let searchQuery = destination;
-      if (preferences.trim()) {
-        searchQuery += ` ${preferences}`;
-      }
-      if (selectedCategories.length > 0) {
-        searchQuery += ` ${selectedCategories.join(" ")}`;
-      }
-
-      console.log("Final search query:", searchQuery);
-
-      // Call Qloo API with enhanced query
-      const results = await qlooService.getRecommendations(
-        searchQuery, // Use enhanced query
-        preferences,
-        {
-          limit: 20, // Get more results
-          page: 1,
-          categories: selectedCategories, // Pass categories if your service supports it
-        }
+      const results = await qlooService.getEnhancedRecommendations(
+        userPreferences
       );
 
-      console.log("Search results received:", results.length, "items");
-
       setRecommendations(results);
-      // Update global state
       updateSearchResults(
         destination,
         preferences,
@@ -118,7 +116,6 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
         );
       }
     } catch (err) {
-      console.error("Search error:", err);
       setError(
         err instanceof Error ? err.message : "Failed to get recommendations"
       );
@@ -152,44 +149,62 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
 
   const totalPages = Math.ceil(recommendations.length / itemsPerPage);
 
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
+  const closeMobileMenu = () => {
+    setIsMobileMenuOpen(false);
+  };
+
+  const handleNavigationClick = (tab: string) => {
+    if (onTabChange) {
+      onTabChange(tab);
+    }
+    closeMobileMenu();
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-secondary-50 to-accent-50 py-4 sm:py-6 lg:py-8">
-      <div className="container mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 space-y-4 sm:space-y-6 lg:space-y-8">
-        {/* Header with Clear Button */}
-        <div className="text-center space-y-2 sm:space-y-4">
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-800">
-              AI Travel Discovery
-            </h1>
-            {hasResults && (
-              <Button
-                onClick={handleClearResults}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2"
-              >
-                <X className="w-4 h-4" />
-                Clear Results
-              </Button>
-            )}
-          </div>
-          <p className="text-sm sm:text-base text-gray-600 max-w-2xl mx-auto">
-            Discover amazing places powered by Qloo's AI recommendations
-          </p>
+    <div className="min-h-screen bg-gradient-to-br from-yellow-100 via-green-100 to-blue-200">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-4 sm:py-6 lg:py-8 space-y-4 sm:space-y-6 lg:space-y-8">
+        <div className="hidden md:flex justify-end">
+          {hasResults && (
+            <Button
+              onClick={handleClearResults}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2 border-blue-300 text-blue-700 hover:bg-blue-50"
+            >
+              <X className="w-4 h-4" />
+              Clear Results
+            </Button>
+          )}
         </div>
 
-        {/* Search Form */}
+        {hasResults && (
+          <div className="md:hidden">
+            <Button
+              onClick={handleClearResults}
+              variant="outline"
+              size="sm"
+              className="w-full flex items-center justify-center gap-2"
+            >
+              <X className="w-4 h-4" />
+              Clear Results
+            </Button>
+          </div>
+        )}
+
         <Card className="border-2 border-primary-200 shadow-lg">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
-              <Search className="w-5 h-5 text-primary-600" />
+          <CardHeader className="pb-3 sm:pb-4">
+            <CardTitle className="text-base sm:text-lg lg:text-xl flex items-center gap-2">
+              <Search className="w-4 h-4 sm:w-5 sm:h-5 text-primary-600" />
               Plan Your Journey
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Destination Input */}
+          <CardContent className="space-y-3 sm:space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">
+              <label className="text-xs sm:text-sm font-medium text-gray-700">
                 Where do you want to go? *
               </label>
               <div className="relative">
@@ -199,30 +214,32 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
                   placeholder="e.g., Paris, Tokyo, New York..."
                   value={destination}
                   onChange={(e) => setDestination(e.target.value)}
-                  className="pl-10 h-12 text-base"
+                  ith
+                  burgur
+                  menu
+                  butto
+                  className="pl-10 h-10 sm:h-12 text-sm sm:text-base"
                 />
               </div>
             </div>
 
-            {/* Preferences Input */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">
+              <label className="text-xs sm:text-sm font-medium text-gray-700">
                 What are you looking for?
               </label>
               <textarea
                 placeholder="e.g., romantic restaurants, family-friendly activities, cultural experiences..."
                 value={preferences}
                 onChange={(e) => setPreferences(e.target.value)}
-                className="w-full min-h-[80px] p-3 border border-gray-300 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full min-h-[60px] sm:min-h-[80px] p-2 sm:p-3 text-sm sm:text-base border border-gray-300 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
             </div>
 
-            {/* Categories */}
             <div className="space-y-3">
-              <label className="text-sm font-medium text-gray-700">
+              <label className="text-xs sm:text-sm font-medium text-gray-700">
                 Categories (optional)
               </label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
                 {[
                   {
                     id: "restaurants",
@@ -294,7 +311,7 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
                   <label
                     key={category.id}
                     className={`
-                      relative flex items-center space-x-3 p-4 rounded-xl cursor-pointer transition-all duration-200 border-2
+                      relative flex items-center space-x-2 sm:space-x-3 p-2 sm:p-3 lg:p-4 rounded-lg sm:rounded-xl cursor-pointer transition-all duration-200 border-2
                       ${
                         selectedCategories.includes(category.id)
                           ? "bg-blue-50 border-blue-400 shadow-md transform scale-[1.02]"
@@ -302,17 +319,16 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
                       }
                     `}
                   >
-                    {/* Custom Checkbox */}
                     <div className="relative">
                       <input
                         type="checkbox"
                         checked={selectedCategories.includes(category.id)}
                         onChange={() => toggleCategory(category.id)}
-                        className="sr-only" // Hide the default checkbox
+                        className="sr-only"
                       />
                       <div
                         className={`
-                        w-5 h-5 rounded border-2 flex items-center justify-center transition-all duration-200
+                        w-4 h-4 sm:w-5 sm:h-5 rounded border-2 flex items-center justify-center transition-all duration-200
                         ${
                           selectedCategories.includes(category.id)
                             ? "bg-blue-500 border-blue-500"
@@ -322,7 +338,7 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
                       >
                         {selectedCategories.includes(category.id) && (
                           <svg
-                            className="w-3 h-3 text-white"
+                            className="w-2 h-2 sm:w-3 sm:h-3 text-white"
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
@@ -336,12 +352,12 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
                       </div>
                     </div>
 
-                    {/* Icon */}
-                    <span className="text-xl">{category.icon}</span>
+                    <span className="text-base sm:text-lg lg:text-xl">
+                      {category.icon}
+                    </span>
 
-                    {/* Label */}
                     <span
-                      className={`text-sm font-medium ${
+                      className={`text-xs sm:text-sm font-medium ${
                         selectedCategories.includes(category.id)
                           ? "text-blue-800"
                           : "text-gray-700"
@@ -353,10 +369,9 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
                 ))}
               </div>
 
-              {/* Selected Categories Display */}
               {selectedCategories.length > 0 && (
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="flex flex-wrap gap-2">
+                <div className="mt-3 sm:mt-4 p-2 sm:p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex flex-wrap gap-1 sm:gap-2">
                     {selectedCategories.map((categoryId) => {
                       const category = [
                         { id: "restaurants", label: "Restaurant", icon: "🍽️" },
@@ -379,9 +394,11 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
                       return category ? (
                         <span
                           key={categoryId}
-                          className="inline-flex items-center gap-1 px-2 py-1 bg-white rounded-md text-sm font-medium text-blue-800 border border-blue-300"
+                          className="inline-flex items-center gap-1 px-2 py-1 bg-white rounded-md text-xs sm:text-sm font-medium text-blue-800 border border-blue-300"
                         >
-                          <span>{category.icon}</span>
+                          <span className="text-xs sm:text-sm">
+                            {category.icon}
+                          </span>
                           <span>{category.label}</span>
                         </span>
                       ) : null;
@@ -391,48 +408,44 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
               )}
             </div>
 
-            {/* Search Button */}
             <Button
               onClick={handleSearch}
               disabled={isLoading || !destination.trim()}
-              className="w-full h-12 text-base font-medium"
+              className="w-full h-10 sm:h-12 text-sm sm:text-base font-medium"
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 mr-2 animate-spin" />
                   Searching...
                 </>
               ) : (
                 <>
-                  <Search className="w-4 h-4 mr-2" />
+                  <Search className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
                   Find Recommendations
                 </>
               )}
             </Button>
 
-            {/* Error Message */}
             {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-700">{error}</p>
+              <div className="p-2 sm:p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-xs sm:text-sm text-red-700">{error}</p>
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Results Section */}
         {recommendations.length > 0 && (
-          <div className="space-y-4 sm:space-y-6">
+          <div className="space-y-3 sm:space-y-4 lg:space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
+              <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-800">
                 Recommendations for {destination}
               </h2>
-              <div className="text-sm text-gray-600">
+              <div className="text-xs sm:text-sm text-gray-600">
                 {recommendations.length} places found
               </div>
             </div>
 
-            {/* Results Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
               {paginatedRecommendations.map((recommendation) => (
                 <SpotCard
                   key={recommendation.id}
@@ -442,7 +455,6 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
               ))}
             </div>
 
-            {/* Pagination */}
             {totalPages > 1 && (
               <div className="flex justify-center items-center space-x-2">
                 <Button
@@ -452,10 +464,11 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
                   onClick={() =>
                     setCurrentPage((prev) => Math.max(1, prev - 1))
                   }
+                  className="text-xs sm:text-sm"
                 >
                   Previous
                 </Button>
-                <span className="text-sm text-gray-600">
+                <span className="text-xs sm:text-sm text-gray-600 px-2">
                   Page {currentPage} of {totalPages}
                 </span>
                 <Button
@@ -465,6 +478,7 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
                   onClick={() =>
                     setCurrentPage((prev) => Math.min(totalPages, prev + 1))
                   }
+                  className="text-xs sm:text-sm"
                 >
                   Next
                 </Button>
