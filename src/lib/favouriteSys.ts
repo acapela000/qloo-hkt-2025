@@ -4,40 +4,67 @@ export interface FavoriteItem {
   id: string;
   name: string;
   type: string;
-  description: string;
+  description?: string;
   image?: string;
+  rating?: number;
+  address?: string;
+  tags?: string[];
   addedAt: string;
 }
 
 export const useFavorites = () => {
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
 
+  // Load favorites from localStorage on mount
   useEffect(() => {
-    const savedFavorites = localStorage.getItem("travel-favorites");
-    if (savedFavorites) {
-      setFavorites(JSON.parse(savedFavorites));
+    const saved = localStorage.getItem("favorites");
+    if (saved) {
+      try {
+        setFavorites(JSON.parse(saved));
+      } catch (error) {
+        console.error("Failed to parse favorites:", error);
+        setFavorites([]);
+      }
     }
   }, []);
 
-  const addToFavorites = (item: Omit<FavoriteItem, "addedAt">) => {
-    const newFavorite: FavoriteItem = {
-      ...item,
+  // Save to localStorage whenever favorites change
+  useEffect(() => {
+    localStorage.setItem("favorites", JSON.stringify(favorites));
+  }, [favorites]);
+
+  const addToFavorites = (item: any) => {
+    const favoriteItem: FavoriteItem = {
+      id: item.id,
+      name: item.name,
+      type: item.type,
+      description: item.description,
+      image: item.image,
+      rating: item.rating,
+      address: item.address,
+      tags: item.tags,
       addedAt: new Date().toISOString(),
     };
 
-    const updatedFavorites = [...favorites, newFavorite];
-    setFavorites(updatedFavorites);
-    localStorage.setItem("travel-favorites", JSON.stringify(updatedFavorites));
+    setFavorites((prev) => {
+      // Avoid duplicates
+      if (prev.some((fav) => fav.id === item.id)) {
+        return prev;
+      }
+      return [...prev, favoriteItem];
+    });
   };
 
   const removeFromFavorites = (id: string) => {
-    const updatedFavorites = favorites.filter((fav) => fav.id !== id);
-    setFavorites(updatedFavorites);
-    localStorage.setItem("travel-favorites", JSON.stringify(updatedFavorites));
+    setFavorites((prev) => prev.filter((fav) => fav.id !== id));
   };
 
   const isFavorited = (id: string) => {
     return favorites.some((fav) => fav.id === id);
+  };
+
+  const clearAllFavorites = () => {
+    setFavorites([]);
   };
 
   return {
@@ -45,5 +72,6 @@ export const useFavorites = () => {
     addToFavorites,
     removeFromFavorites,
     isFavorited,
+    clearAllFavorites,
   };
 };
