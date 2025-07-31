@@ -1,6 +1,11 @@
+// API Configuration
+const QLOO_API_BASE = "https://hackathon.api.qloo.com";
+
 // Types
 export interface UserPreferences {
   destination: string;
+  preferences: string;
+  selectedCategories: string[];
   numberOfDays: number;
   budget: "low" | "medium" | "high";
   travelStyle: "solo" | "couple" | "family" | "group";
@@ -57,292 +62,559 @@ export class QlooApiService {
 
   async getRecommendations(
     destination: string,
-    preferences?: string,
-    options?: {
-      limit?: number;
-      page?: number;
-      type?: string;
-    }
+    preferences: string = "",
+    options: { limit?: number; page?: number; categories?: string[] } = {}
   ): Promise<Recommendation[]> {
     try {
-      console.log("Making request to Qloo API via server route...");
+      console.log("🔍 Getting recommendations from Qloo API...");
+      console.log("Input params:", { destination, preferences, options });
 
+      // Build a comprehensive search query
+      let searchQuery = destination;
+
+      // Add preferences to the query
+      if (preferences.trim()) {
+        searchQuery += ` ${preferences}`;
+      }
+
+      // Add categories to the query for better results
+      if (options.categories && options.categories.length > 0) {
+        const categoryTerms = options.categories
+          .map((cat) => {
+            // Map categories to better search terms
+            const categoryMap: Record<string, string> = {
+              restaurants: "restaurants dining food",
+              attractions: "attractions sightseeing landmarks",
+              hotels: "hotels accommodation lodging",
+              entertainment: "entertainment shows events",
+              shopping: "shopping retail markets",
+              museums: "museums galleries cultural",
+              parks: "parks nature outdoor",
+              nightlife: "nightlife bars clubs",
+              cafes: "cafes coffee shops",
+              activities: "activities experiences tours",
+            };
+            return categoryMap[cat] || cat;
+          })
+          .join(" ");
+
+        searchQuery += ` ${categoryTerms}`;
+      }
+
+      console.log("Final search query for Qloo:", searchQuery);
+
+      const limit = options.limit || 20;
+      const encodedQuery = encodeURIComponent(searchQuery);
+      const url = `${QLOO_API_BASE}/search?query=${encodedQuery}&limit=${limit}`;
+
+      console.log("Qloo API URL:", url);
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "X-API-Key": QLOO_API_KEY!,
+          Accept: "application/json",
+        },
+      });
+
+      console.log("Qloo API response status:", response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Qloo API error response:", errorText);
+        throw new Error(`Qloo API error: ${response.status} - ${errorText}`);
+      }
+
+      const qlooData = await response.json();
+      console.log("Raw Qloo response:", qlooData);
+
+      // Transform the data
+      const recommendations = this.transformQlooSearchData(qlooData, {
+        destination,
+        preferences,
+        selectedCategories: options.categories || [],
+      });
+
+      console.log(`✅ Transformed ${recommendations.length} recommendations`);
+      return recommendations;
+    } catch (error) {
+      console.error("❌ Error in getRecommendations:", error);
+
+      // Return fallback recommendations
+      console.log("🔄 Generating fallback recommendations...");
+      return this.generateFallbackRecommendations({
+        destination,
+        preferences,
+        selectedCategories: options.categories || [],
+      });
+    }
+  }
+
+  private generateFallbackRecommendations(
+    preferences: UserPreferences
+  ): Recommendation[] {
+    console.log("Generating fallback recommendations for:", preferences);
+
+    const { destination, selectedCategories } = preferences;
+
+    // Enhanced fallback data with better coverage
+    const fallbackData: Array<{
+      name: string;
+      type: string;
+      description: string;
+      category: string;
+    }> = [
+      // Restaurants & Food
+      {
+        name: `Traditional ${destination} Restaurant`,
+        type: "restaurant",
+        description: "Authentic local cuisine and specialties",
+        category: "restaurants",
+      },
+      {
+        name: `${destination} Food Market`,
+        type: "restaurant",
+        description: "Traditional food market with local vendors",
+        category: "food",
+      },
+      {
+        name: `${destination} Street Food District`,
+        type: "restaurant",
+        description: "Popular street food area",
+        category: "food",
+      },
+
+      // History & Culture
+      {
+        name: `${destination} Historical Museum`,
+        type: "museum",
+        description: "Local history and cultural artifacts",
+        category: "history",
+      },
+      {
+        name: `${destination} Cultural Center`,
+        type: "museum",
+        description: "Traditional arts and cultural exhibitions",
+        category: "culture",
+      },
+      {
+        name: `Historic Quarter of ${destination}`,
+        type: "attraction",
+        description: "Well-preserved historical district",
+        category: "history",
+      },
+      {
+        name: `${destination} Art Gallery`,
+        type: "museum",
+        description: "Local and contemporary art collections",
+        category: "culture",
+      },
+
+      // Attractions
+      {
+        name: `${destination} Historic Center`,
+        type: "attraction",
+        description: "Historic city center with landmarks",
+        category: "attractions",
+      },
+      {
+        name: `${destination} Landmark`,
+        type: "attraction",
+        description: "Iconic city landmark",
+        category: "attractions",
+      },
+
+      // Hotels
+      {
+        name: `Heritage Hotel ${destination}`,
+        type: "hotel",
+        description: "Historic luxury accommodation",
+        category: "hotels",
+      },
+
+      // Entertainment
+      {
+        name: `${destination} Cultural Theater`,
+        type: "entertainment",
+        description: "Traditional performances and shows",
+        category: "entertainment",
+      },
+
+      // Shopping
+      {
+        name: `${destination} Artisan Market`,
+        type: "shopping",
+        description: "Local crafts and artisan products",
+        category: "shopping",
+      },
+
+      // Museums
+      {
+        name: `${destination} National Museum`,
+        type: "museum",
+        description: "National history and culture museum",
+        category: "museums",
+      },
+
+      // Parks
+      {
+        name: `${destination} Heritage Park`,
+        type: "park",
+        description: "Historic park with cultural significance",
+        category: "parks",
+      },
+
+      // Nightlife
+      {
+        name: `${destination} Cultural District`,
+        type: "entertainment",
+        description: "Evening cultural activities and venues",
+        category: "nightlife",
+      },
+
+      // Cafes
+      {
+        name: `Traditional ${destination} Cafe`,
+        type: "cafe",
+        description: "Historic coffee house with local atmosphere",
+        category: "cafes",
+      },
+
+      // Activities
+      {
+        name: `${destination} Cultural Tour`,
+        type: "activity",
+        description: "Guided historical and cultural tour",
+        category: "activities",
+      },
+    ];
+
+    // Filter based on selected categories, or show all if none selected
+    const filteredData =
+      selectedCategories.length > 0
+        ? fallbackData.filter((item) =>
+            selectedCategories.includes(item.category)
+          )
+        : fallbackData;
+
+    return filteredData.slice(0, 12).map((item, index) => ({
+      id: `fallback-${Date.now()}-${index}`,
+      name: item.name,
+      type: item.type,
+      image:
+        "https://via.placeholder.com/300x200/e2e8f0/64748b?text=Travel+Spot",
+      rating: 4.0 + Math.random(),
+      address: `${destination}`,
+      description: item.description,
+      tags: [item.category, destination.toLowerCase(), "local"],
+    }));
+  }
+
+  private transformQlooSearchData(
+    qlooData: any,
+    preferences: UserPreferences
+  ): Recommendation[] {
+    console.log("=== Transform Qloo Data Debug ===");
+    console.log("Input data structure:", {
+      hasResults: !!qlooData?.results,
+      resultsIsArray: Array.isArray(qlooData?.results),
+      resultCount: qlooData?.results?.length || 0,
+    });
+
+    if (!qlooData?.results || !Array.isArray(qlooData.results)) {
+      console.error("❌ Invalid results structure");
+      return [];
+    }
+
+    if (qlooData.results.length === 0) {
+      console.log("❌ Empty results array");
+      return [];
+    }
+
+    console.log("✅ Processing", qlooData.results.length, "results");
+
+    const recommendations: Recommendation[] = [];
+
+    for (let i = 0; i < qlooData.results.length; i++) {
+      const item = qlooData.results[i];
+      console.log(
+        `\n=== Processing item ${i + 1}/${qlooData.results.length} ===`
+      );
+      console.log("Item:", JSON.stringify(item, null, 2));
+
+      try {
+        // Extract basic data with extensive logging
+        const name = item.name || `Location ${i + 1}`;
+        console.log("✅ Name:", name);
+
+        const description =
+          item.properties?.description ||
+          `Visit ${name} in ${preferences.destination}`;
+        console.log("✅ Description:", description);
+
+        const image =
+          item.properties?.image?.url ||
+          "https://via.placeholder.com/300x200/e2e8f0/64748b?text=Travel+Spot";
+        console.log("✅ Image:", image);
+
+        const rating =
+          item.properties?.business_rating ||
+          (item.popularity ? Number((item.popularity * 5).toFixed(1)) : 4.0);
+        console.log("✅ Rating:", rating);
+
+        const address =
+          item.properties?.address ||
+          item.properties?.geocode?.city ||
+          preferences.destination;
+        console.log("✅ Address:", address);
+
+        const coordinates = item.location
+          ? {
+              lat: item.location.lat || 0,
+              lng: item.location.lon || item.location.lng || 0,
+            }
+          : undefined;
+        console.log("✅ Coordinates:", coordinates);
+
+        // Simple type mapping
+        const primaryType = item.types?.[0] || "attraction";
+        const type = primaryType.includes("place")
+          ? "restaurant"
+          : "attraction";
+        console.log("✅ Type:", type, "from", primaryType);
+
+        // Simple tags
+        const tags = [preferences.destination.toLowerCase(), type, "qloo"];
+        console.log("✅ Tags:", tags);
+
+        const recommendation: Recommendation = {
+          id: item.entity_id || `qloo-${Date.now()}-${i}`,
+          name,
+          type,
+          image,
+          rating,
+          address,
+          description,
+          tags,
+          coordinates,
+          qlooScore: item.popularity,
+        };
+
+        console.log("✅ Created recommendation:", recommendation);
+        recommendations.push(recommendation);
+      } catch (itemError) {
+        console.error(`❌ Error processing item ${i}:`, itemError);
+        console.log("Problematic item:", item);
+      }
+    }
+
+    console.log(`\n=== Transform Complete ===`);
+    console.log("Successfully transformed:", recommendations.length, "items");
+    console.log("Sample result:", recommendations[0]);
+
+    return recommendations;
+  }
+
+  async tryQlooSearch(
+    query: string,
+    preferences: UserPreferences
+  ): Promise<Recommendation[]> {
+    console.log("=== Try Qloo Search via API Route ===");
+    console.log("Query:", query);
+
+    try {
       const response = await fetch(this.apiRoute, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          destination,
-          preferences,
-          options,
+          query,
+          limit: 0,
         }),
       });
+
+      console.log("📥 API Route Response status:", response.status);
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(
-          errorData.error || `API request failed: ${response.status}`
-        );
+        console.error("❌ API Route Error:", errorData);
+        return [];
       }
 
       const data = await response.json();
-      console.log("Raw Qloo API response:", data);
+      console.log("📊 API Route Response data:", JSON.stringify(data, null, 2));
 
-      return this.transformQlooInsights(data);
+      if (
+        data &&
+        data.results &&
+        Array.isArray(data.results) &&
+        data.results.length > 0
+      ) {
+        console.log("✅ Found real API data:", data.results.length, "results");
+        console.log("🔍 First result sample:", data.results[0]);
+
+        const transformed = this.transformQlooSearchData(data, preferences);
+        console.log(
+          "✅ Transformed data:",
+          transformed.length,
+          "recommendations"
+        );
+        console.log("🔍 First transformed result:", transformed[0]);
+
+        // **KEY FIX**: Return transformed data even if empty, don't fall back here
+        return transformed;
+      } else {
+        console.log("❌ No valid results in response");
+        console.log("Response structure:", Object.keys(data || {}));
+        return [];
+      }
     } catch (error) {
-      console.error("QlooApiService Error:", error);
-      throw error;
-    }
-  }
-
-  private transformQlooInsights(data: any): Recommendation[] {
-    // Handle different possible response structures from Qloo
-    let insights: QlooInsight[] = [];
-
-    if (data.insights) {
-      insights = data.insights;
-    } else if (data.results) {
-      insights = data.results;
-    } else if (data.recommendations) {
-      insights = data.recommendations;
-    } else if (Array.isArray(data)) {
-      insights = data;
-    } else {
-      console.warn("Unexpected Qloo API response structure:", data);
+      console.error("❌ Network/Fetch Error:", error);
       return [];
     }
-
-    console.log("Processing", insights.length, "insights from Qloo");
-
-    return insights.map((insight: QlooInsight, index: number) => {
-      const recommendation: Recommendation = {
-        id: insight.id || `qloo-insight-${index}`,
-        name: insight.name || insight.title || `Recommendation ${index + 1}`,
-        type: this.mapQlooType(
-          insight.metadata?.type || insight.metadata?.category
-        ),
-        description:
-          insight.description ||
-          insight.explanation ||
-          "Recommended by Qloo AI",
-        image: this.extractBestImage(insight),
-        rating: insight.metadata?.rating || insight.score || undefined,
-        address: this.formatLocationInfo(insight.metadata?.location),
-        tags: this.extractTags(insight), // This method needs to be fixed too
-        coordinates: insight.metadata?.location?.coordinates || {
-          lat: 0,
-          lng: 0,
-        },
-        qlooScore: insight.score,
-        qlooExplanation: insight.explanation,
-        tasteProfile: insight.metadata?.tags || [],
-      };
-
-      console.log("Transformed recommendation:", recommendation);
-      return recommendation;
-    });
   }
 
-  private mapQlooType(type?: string): string {
-    if (!type) return "attraction";
-
-    const typeMap: Record<string, string> = {
-      restaurant: "restaurant",
-      dining: "restaurant",
-      food: "restaurant",
-      hotel: "hotel",
-      lodging: "hotel",
-      accommodation: "hotel",
-      attraction: "attraction",
-      landmark: "attraction",
-      museum: "museum",
-      gallery: "museum",
-      art: "museum",
-      entertainment: "entertainment",
-      nightlife: "entertainment",
-      music: "entertainment",
-      shopping: "shopping",
-      retail: "shopping",
-      park: "park",
-      nature: "park",
-      outdoor: "park",
-      activity: "activity",
-      experience: "activity",
-      tour: "activity",
-    };
-
-    const lowerType = type.toLowerCase();
-    return typeMap[lowerType] || "attraction";
-  }
-
-  private extractBestImage(insight: QlooInsight): string {
-    // Try to get image from metadata
-    if (insight.metadata?.images && insight.metadata.images.length > 0) {
-      return insight.metadata.images[0];
-    }
-
-    // Fallback to generated image based on name and type
-    const name = insight.name || insight.title || "place";
-    const type =
-      insight.metadata?.type || insight.metadata?.category || "travel";
-    return `https://source.unsplash.com/400x250/?${encodeURIComponent(
-      name
-    )},${encodeURIComponent(type)}`;
-  }
-
-  private formatLocationInfo(location?: any): string {
-    if (!location) return "Location not specified";
-
-    if (location.address) return location.address;
-
-    const parts = [
-      location.city,
-      location.state || location.region,
-      location.country,
-    ].filter(Boolean);
-
-    return parts.length > 0 ? parts.join(", ") : "Location not specified";
-  }
-
-  private extractTags(insight: QlooInsight): string[] {
-    const tags = new Set<string>();
-
-    // Add tags from metadata - ensure they are strings
-    if (insight.metadata?.tags && Array.isArray(insight.metadata.tags)) {
-      insight.metadata.tags.forEach((tag) => {
-        if (typeof tag === "string") {
-          tags.add(tag);
-        } else if (tag && typeof tag === "object" && tag.name) {
-          tags.add(tag.name);
-        } else if (tag && typeof tag === "object" && tag.value) {
-          tags.add(tag.value);
-        }
-      });
-    }
-
-    // Add type/category as tags - ensure they are strings
-    if (insight.metadata?.type && typeof insight.metadata.type === "string") {
-      tags.add(insight.metadata.type);
-    }
-    if (
-      insight.metadata?.category &&
-      typeof insight.metadata.category === "string"
-    ) {
-      tags.add(insight.metadata.category);
-    }
-
-    // Return only valid string tags
-    return Array.from(tags)
-      .filter((tag) => typeof tag === "string" && tag.trim().length > 0)
-      .slice(0, 6);
-  }
-
-  // Cultural recommendations using Qloo's taste analysis
-  async getCulturalRecommendations(
-    destination: string,
-    culturalContext: string,
-    userTasteProfile?: string[]
+  async getEnhancedRecommendations(
+    preferences: UserPreferences
   ): Promise<Recommendation[]> {
-    try {
-      const response = await fetch("/api/qloo/cultural", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          destination,
-          culturalContext,
-          userTasteProfile,
-        }),
-      });
+    console.log("=== Getting Enhanced Recommendations ===");
+    console.log("Preferences:", preferences);
 
-      if (!response.ok) {
-        throw new Error("Cultural recommendations failed");
-      }
-
-      const data = await response.json();
-      return this.transformQlooInsights(data);
-    } catch (error) {
-      console.error("Cultural recommendations error:", error);
-      // Fallback to regular recommendations
-      return this.getRecommendations(destination, culturalContext);
+    if (!preferences.destination?.trim()) {
+      console.error("Empty destination provided");
+      return this.generateFallbackRecommendations(preferences);
     }
+
+    const destination = preferences.destination.trim();
+    console.log("🎯 Destination:", destination);
+
+    // **SIMPLIFIED STRATEGY**: Try fewer, more targeted searches first
+    const searchStrategies = [
+      // Strategy 1: Simple category-based searches
+      `restaurants ${destination}`,
+      `hotels ${destination}`,
+      `attractions ${destination}`,
+      `museums ${destination}`,
+
+      // Strategy 2: Try with selected categories
+      ...preferences.selectedCategories.map(
+        (category) => `${category} ${destination}`
+      ),
+
+      // Strategy 3: Simple destination search as fallback
+      destination,
+    ];
+
+    console.log("🎯 Total search strategies:", searchStrategies.length);
+
+    // Try each search strategy
+    for (const [index, query] of searchStrategies.entries()) {
+      if (!query || query.trim() === "") continue;
+
+      console.log(`🎯 Strategy ${index + 1}: "${query}"`);
+      const results = await this.tryQlooSearch(query, preferences);
+
+      console.log(
+        `📊 Strategy ${index + 1} returned ${results.length} results`
+      );
+
+      if (results.length > 0) {
+        // **REMOVE FILTERING FOR NOW** - Let's see all results first
+        console.log(
+          `✅ Returning ${results.length} results from strategy ${index + 1}`
+        );
+        return results.slice(0, 12);
+      }
+    }
+
+    console.warn("❌ All Qloo API strategies returned empty, using fallback");
+    return this.generateFallbackRecommendations(preferences);
   }
 }
 
-export default QlooApiService;
+// Create a singleton instance
+const qlooService = new QlooApiService();
 
-// API Configuration
-const QLOO_API_BASE = "https://hackathon.api.qloo.com";
-const QLOO_API_KEY = process.env.QLOO_API_KEY || "";
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
+// Export the singleton instance as default
+export default qlooService;
 
-// Debug logging
-console.log("=== API Keys Debug ===");
-console.log("QLOO_API_KEY present:", !!QLOO_API_KEY);
-console.log("QLOO_API_KEY length:", QLOO_API_KEY.length);
-console.log("OPENAI_API_KEY present:", !!OPENAI_API_KEY);
-console.log("OPENAI_API_KEY length:", OPENAI_API_KEY.length);
+// Also export the class for direct instantiation if needed
 
-// Update the headers to use only X-API-Key
-const getQlooHeaders = () => {
-  console.log(
-    "Using Qloo API Key:",
-    QLOO_API_KEY ? `${QLOO_API_KEY.substring(0, 10)}...` : "MISSING"
-  );
-
-  return {
-    "X-API-Key": QLOO_API_KEY, // Only use X-API-Key as per documentation
-    "Content-Type": "application/json",
-    Accept: "application/json",
-  };
-};
-
-// OpenAI API Headers - IMPLEMENT THIS FUNCTION
-const getOpenAIHeaders = () => {
-  return {
-    Authorization: `Bearer ${OPENAI_API_KEY}`,
-    "Content-Type": "application/json",
-  };
-};
-
-// Update the category mapping based on Qloo documentation
+// Update the mapInterestsToQlooCategories function
 const mapInterestsToQlooCategories = (interests: string[]): string[] => {
   const categoryMap: { [key: string]: string[] } = {
-    food: ["restaurant", "cafe", "bar"],
+    restaurants: ["restaurant", "dining", "food"],
+    food: ["restaurant", "dining", "cuisine", "culinary", "food"],
+    hotels: ["hotel", "accommodation", "lodging"],
+    attractions: ["attraction", "landmark", "sightseeing"],
+    museums: ["museum", "gallery", "cultural"],
+    parks: ["park", "nature", "outdoor"],
+    entertainment: ["entertainment", "shows", "nightlife"],
+    shopping: ["shopping", "retail", "market"],
+    cafes: ["cafe", "coffee"],
+    history: [
+      "museum",
+      "cultural",
+      "heritage",
+      "historical",
+      "historic",
+      "monument",
+    ],
+    culture: [
+      "cultural",
+      "museum",
+      "art",
+      "heritage",
+      "gallery",
+      "traditional",
+    ],
     nightlife: ["bar", "nightclub", "entertainment"],
-    adventure: ["attraction", "outdoor", "sports"],
-    photography: ["landmark", "museum", "attraction"],
-    relaxation: ["spa", "park", "wellness"],
-    shopping: ["shopping", "retail"],
+    adventure: ["outdoor", "activity", "adventure"],
+    photography: ["scenic", "landmark", "attraction"],
+    relaxation: ["spa", "wellness", "peaceful"],
   };
 
   const categories = new Set<string>();
   interests.forEach((interest) => {
-    if (categoryMap[interest]) {
-      categoryMap[interest].forEach((cat) => categories.add(cat));
+    const mapped = categoryMap[interest.toLowerCase()];
+    if (mapped) {
+      mapped.forEach((cat) => categories.add(cat));
+    } else {
+      categories.add(interest.toLowerCase());
     }
   });
 
   return Array.from(categories);
 };
 
-// Add this function after mapInterestsToQlooCategories (around line 85)
+// Update the mapInterestsToQlooEntityTypes function
 const mapInterestsToQlooEntityTypes = (interests: string[]): string[] => {
   const entityTypeMap: { [key: string]: string[] } = {
+    restaurants: ["restaurant", "bar", "cafe"],
     food: ["restaurant", "bar", "cafe"],
+    hotels: ["hotel", "resort"],
+    attractions: ["attraction", "landmark"],
+    museums: ["museum", "gallery"],
+    parks: ["park", "recreation"],
+    entertainment: ["entertainment", "venue"],
+    shopping: ["shopping", "retail"],
+    cafes: ["cafe", "coffee_shop"],
+    history: ["museum", "monument", "historic_site"],
+    culture: ["museum", "cultural_center", "gallery"],
     nightlife: ["bar", "nightclub"],
     adventure: ["attraction", "outdoor"],
     photography: ["attraction", "landmark"],
     relaxation: ["hotel", "spa"],
-    shopping: ["shopping", "retail"],
   };
 
   const entityTypes = new Set<string>();
   interests.forEach((interest) => {
-    if (entityTypeMap[interest]) {
-      entityTypeMap[interest].forEach((type) => entityTypes.add(type));
+    const mapped = entityTypeMap[interest.toLowerCase()];
+    if (mapped) {
+      mapped.forEach((type) => entityTypes.add(type));
+    } else {
+      entityTypes.add(interest.toLowerCase());
     }
   });
 
@@ -377,369 +649,18 @@ Please provide ${
 Only return valid JSON, no extra text.`;
 };
 
-// Update the test function to show more detailed errors
-export const testQlooInsightsAPI = async () => {
-  try {
-    console.log("=== Testing Qloo Search API ===");
-
-    if (!QLOO_API_KEY) {
-      console.log("❌ No Qloo API key found");
-      return false;
-    }
-
-    const testUrl = `${QLOO_API_BASE}/search?query=${encodeURIComponent(
-      "restaurants in New York"
-    )}&limit=5`;
-    console.log("Test URL:", testUrl);
-
-    const response = await fetch(testUrl, {
-      method: "GET",
-      headers: {
-        "X-API-Key": QLOO_API_KEY,
-        Accept: "application/json",
-      },
-    });
-
-    console.log("Response status:", response.status);
-
-    if (response.ok) {
-      const data = await response.json();
-      console.log("✅ API Test Success!");
-      console.log("Result count:", data.results?.length || 0);
-      console.log("First result:", data.results?.[0]?.name);
-      return true;
-    } else {
-      const errorText = await response.text();
-      console.log("❌ API Test Failed:", response.status);
-      console.log("Error details:", errorText);
-      return false;
-    }
-  } catch (error) {
-    console.error("❌ API Test Error:", error);
-    return false;
-  }
+// Update standalone functions to use the singleton instance
+export const testQlooInsightsAPI = async (): Promise<boolean> => {
+  return qlooService.testQlooInsightsAPI();
 };
 
-// Enhanced getRecommendations function with multiple fallback strategies
 export const getRecommendations = async (
   preferences: UserPreferences
 ): Promise<Recommendation[]> => {
-  console.log("=== Getting Recommendations ===");
-  console.log("Preferences:", preferences);
-
-  if (!preferences.destination || preferences.destination.trim() === "") {
-    console.error("Empty destination provided");
-    return generateFallbackRecommendations(preferences);
-  }
-
-  try {
-    if (!QLOO_API_KEY) {
-      console.warn("No Qloo API key found, falling back to AI recommendations");
-      return getAIRecommendations(preferences);
-    }
-
-    const destination = preferences.destination.trim();
-
-    // Strategy 1: Try with interests and destination
-    console.log("🎯 Strategy 1: Interest-based search");
-    const interestTerms = preferences.interests.join(" ");
-    const searchQuery = `${interestTerms} places to visit in ${destination}`;
-
-    let result = await tryQlooSearch(searchQuery, preferences);
-    if (result.length > 0) {
-      console.log("✅ Success with interest-based search");
-      return result;
-    }
-
-    // Strategy 2: Try with just destination
-    console.log("🎯 Strategy 2: Basic destination search");
-    const basicQuery = `places to visit in ${destination}`;
-    result = await tryQlooSearch(basicQuery, preferences);
-    if (result.length > 0) {
-      console.log("✅ Success with basic destination search");
-      return result;
-    }
-
-    // Strategy 3: Try with popular attractions
-    console.log("🎯 Strategy 3: Popular attractions search");
-    const attractionsQuery = `popular attractions ${destination}`;
-    result = await tryQlooSearch(attractionsQuery, preferences);
-    if (result.length > 0) {
-      console.log("✅ Success with attractions search");
-      return result;
-    }
-
-    // Strategy 4: Try with restaurants (usually has better coverage)
-    console.log("🎯 Strategy 4: Restaurant search");
-    const restaurantQuery = `restaurants in ${destination}`;
-    result = await tryQlooSearch(restaurantQuery, preferences);
-    if (result.length > 0) {
-      console.log("✅ Success with restaurant search");
-      return result;
-    }
-
-    // Strategy 5: Try broader geographic terms
-    console.log("🎯 Strategy 5: Broader geographic search");
-    const broadQuery = `${destination} travel guide`;
-    result = await tryQlooSearch(broadQuery, preferences);
-    if (result.length > 0) {
-      console.log("✅ Success with broad search");
-      return result;
-    }
-
-    // Strategy 6: Fall back to AI recommendations
-    console.log("🎯 Strategy 6: AI fallback");
-    const aiResult = await getAIRecommendations(preferences);
-    if (aiResult.length > 0) {
-      console.log("✅ Success with AI recommendations");
-      return aiResult;
-    }
-
-    // Final fallback
-    console.warn(
-      "All strategies failed, using static fallback recommendations"
-    );
-    return generateFallbackRecommendations(preferences);
-  } catch (error) {
-    console.error("Error in getRecommendations:", error);
-    // Try AI as backup
-    try {
-      const aiResult = await getAIRecommendations(preferences);
-      if (aiResult.length > 0) return aiResult;
-    } catch (aiError) {
-      console.error("AI fallback also failed:", aiError);
-    }
-    return generateFallbackRecommendations(preferences);
-  }
+  return qlooService.getEnhancedRecommendations(preferences);
 };
 
-// Helper function to try Qloo search with different queries
-const tryQlooSearch = async (
-  query: string,
-  preferences: UserPreferences
-): Promise<Recommendation[]> => {
-  try {
-    const searchUrl = `${QLOO_API_BASE}/search?query=${encodeURIComponent(
-      query
-    )}&limit=10`;
-    console.log("Trying Qloo search:", searchUrl);
-
-    const response = await fetch(searchUrl, {
-      method: "GET",
-      headers: {
-        "X-API-Key": QLOO_API_KEY,
-        Accept: "application/json",
-      },
-    });
-
-    console.log(`Qloo Response Status for "${query}":`, response.status);
-
-    if (response.ok) {
-      const data = await response.json();
-      console.log("Qloo Response Data:", data);
-
-      if (data.results && data.results.length > 0) {
-        return transformQlooSearchData(data, preferences);
-      } else {
-        console.log("No results found for query:", query);
-      }
-    } else {
-      const errorText = await response.text();
-      console.error("Qloo API Error for query:", query, errorText);
-    }
-  } catch (error) {
-    console.error("Error in tryQlooSearch:", error);
-  }
-
-  return [];
-};
-
-// Enhanced AI recommendations function
-const getAIRecommendations = async (
-  preferences: UserPreferences
-): Promise<Recommendation[]> => {
-  if (!OPENAI_API_KEY) {
-    console.log("No OpenAI key, using static fallback");
-    return generateFallbackRecommendations(preferences);
-  }
-
-  const prompt = generateRecommendationPrompt(preferences);
-
-  try {
-    console.log("Trying OpenAI API...");
-    const result = await callOpenAIAPI(prompt);
-    if (result && result.length > 0) {
-      console.log("✅ Success with OpenAI");
-      return result;
-    }
-  } catch (error) {
-    console.log("❌ OpenAI failed:", error);
-  }
-
-  // Final fallback
-  console.log("AI failed, using static fallback recommendations");
-  return generateFallbackRecommendations(preferences);
-};
-
-// Enhanced fallback recommendations with location-specific data
-const generateFallbackRecommendations = (
-  preferences: UserPreferences
-): Recommendation[] => {
-  console.log(
-    "Generating fallback recommendations for:",
-    preferences.destination
-  );
-
-  const destination = preferences.destination;
-
-  // More diverse fallback recommendations
-  const fallbacks: Recommendation[] = [
-    {
-      id: `fallback-${Date.now()}-1`,
-      name: `${destination} Historic District`,
-      type: "Historical Site",
-      image:
-        "https://via.placeholder.com/300x200/e2e8f0/64748b?text=Historic+District",
-      rating: 4.2,
-      address: `Historic Area, ${destination}`,
-      description: `Explore the rich history and cultural heritage of ${destination}'s historic district.`,
-      tags: ["Historic", "Walking", "Cultural", "Architecture"],
-    },
-    {
-      id: `fallback-${Date.now()}-2`,
-      name: `Local Cuisine Tour`,
-      type: "Food Experience",
-      image:
-        "https://via.placeholder.com/300x200/e2e8f0/64748b?text=Local+Food",
-      rating: 4.5,
-      address: `Food District, ${destination}`,
-      description: `Taste authentic local flavors and traditional dishes unique to ${destination}.`,
-      tags: ["Food", "Local", "Authentic", "Cultural"],
-    },
-    {
-      id: `fallback-${Date.now()}-3`,
-      name: `${destination} Art & Culture Center`,
-      type: "Museum",
-      image:
-        "https://via.placeholder.com/300x200/e2e8f0/64748b?text=Art+Museum",
-      rating: 4.3,
-      address: `Cultural District, ${destination}`,
-      description: `Discover local art, culture, and exhibitions showcasing ${destination}'s creative spirit.`,
-      tags: ["Culture", "Art", "Educational", "Indoor"],
-    },
-    {
-      id: `fallback-${Date.now()}-4`,
-      name: `${destination} City Park`,
-      type: "Park",
-      image: "https://via.placeholder.com/300x200/e2e8f0/64748b?text=City+Park",
-      rating: 4.1,
-      address: `Central Park Area, ${destination}`,
-      description: `Relax and enjoy nature in this beautiful green space in the heart of ${destination}.`,
-      tags: ["Nature", "Relaxation", "Outdoor", "Walking"],
-    },
-    {
-      id: `fallback-${Date.now()}-5`,
-      name: `${destination} Shopping District`,
-      type: "Shopping",
-      image: "https://via.placeholder.com/300x200/e2e8f0/64748b?text=Shopping",
-      rating: 4.0,
-      address: `Shopping Area, ${destination}`,
-      description: `Browse local shops, markets, and boutiques for unique finds and souvenirs.`,
-      tags: ["Shopping", "Local", "Souvenirs", "Markets"],
-    },
-  ];
-
-  return fallbacks.slice(0, Math.max(3, preferences.numberOfDays * 2));
-};
-
-// Update the transformQlooSearchData function to handle empty/failed responses better
-const transformQlooSearchData = (
-  qlooData: any,
-  preferences: UserPreferences
-): Recommendation[] => {
-  if (!qlooData || !qlooData.results || !Array.isArray(qlooData.results)) {
-    console.log("No valid results from Qloo search, using fallback");
-    return generateFallbackRecommendations(preferences);
-  }
-
-  // Safe tag extraction function
-  const extractTags = (item: any): string[] => {
-    const tags: string[] = [];
-
-    // Handle different tag formats from Qloo API
-    if (item.tags && Array.isArray(item.tags)) {
-      item.tags.forEach((tag: any) => {
-        if (typeof tag === "string") {
-          tags.push(tag);
-        } else if (tag && typeof tag === "object" && tag.name) {
-          tags.push(tag.name);
-        } else if (tag && typeof tag === "object" && tag.value) {
-          tags.push(tag.value);
-        }
-      });
-    }
-
-    // Add type as a tag if available
-    if (item.types && Array.isArray(item.types)) {
-      item.types.forEach((type: any) => {
-        const cleanType =
-          typeof type === "string" ? type.replace("urn:tag:", "") : "";
-        if (cleanType) tags.push(cleanType);
-      });
-    }
-
-    // Remove duplicates and ensure all are strings
-    return [
-      ...new Set(
-        tags.filter((tag) => typeof tag === "string" && tag.trim().length > 0)
-      ),
-    ];
-  };
-
-  const recommendations: Recommendation[] = qlooData.results.map(
-    (item: any, index: number) => ({
-      id: item.entity_id || `qloo-search-${Date.now()}-${index}`,
-      name: item.name || "Unknown Location",
-      type: item.types?.[0]?.replace("urn:tag:", "") || "General",
-      image:
-        item.image_url ||
-        "https://via.placeholder.com/300x200/e2e8f0/64748b?text=Travel+Spot",
-      rating: item.popularity
-        ? parseFloat((item.popularity * 5).toFixed(1))
-        : 4.0,
-      address: item.location?.address || `${preferences.destination}`,
-      description:
-        item.summary ||
-        `Discover this popular spot in ${preferences.destination}`,
-      tags: extractTags(item),
-      coordinates: item.location
-        ? {
-            lat: item.location.lat || 0,
-            lng: item.location.lng || 0,
-          }
-        : undefined,
-      qlooScore: item.popularity,
-      qlooExplanation: item.explanation,
-    })
-  );
-
-  console.log(
-    `Transformed ${recommendations.length} Qloo search recommendations`
-  );
-
-  // Ensure we have at least some recommendations
-  if (recommendations.length < 3) {
-    const fallback = generateFallbackRecommendations(preferences);
-    return [
-      ...recommendations,
-      ...fallback.slice(0, 3 - recommendations.length),
-    ];
-  }
-
-  return recommendations.slice(0, 9);
-};
-
-// Additional functions
+// Keep the other utility functions as they are
 export const createItinerary = async (
   preferences: UserPreferences,
   selectedSpots: Recommendation[]
