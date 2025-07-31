@@ -18,21 +18,48 @@ import {
   User,
 } from "lucide-react";
 import SpotCard from "./SpotCard";
-import qlooService, {
-  QlooApiService,
-  type Recommendation,
-} from "@/services/QlooApiService";
+import { QlooApiService } from "@/services/QlooApiService";
+import qlooService from "@/services/QlooApiService";
 
 interface TravelItineraryAppProps {
   onAddToItinerary?: (item: any, itineraryId?: string) => void;
   onTabChange?: (tab: string) => void;
   hideMobileNav?: boolean; // Add this prop
+  currentPage?: number;
+  onPageChange?: (page: number) => void;
 }
+
+const usePagination = (items: any[], itemsPerPage: number = 9) => {
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Reset to page 1 when items change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [items.length]);
+
+  const totalPages = Math.ceil(items.length / itemsPerPage);
+  const validCurrentPage = Math.max(1, Math.min(currentPage, totalPages || 1));
+
+  const startIndex = (validCurrentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedItems = items.slice(startIndex, endIndex);
+
+  return {
+    currentPage: validCurrentPage,
+    setCurrentPage,
+    totalPages,
+    paginatedItems,
+    startIndex,
+    endIndex,
+  };
+};
 
 const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
   onAddToItinerary,
   onTabChange,
   hideMobileNav = false, // Default to false
+  currentPage,
+  onPageChange,
 }) => {
   const { searchState, updateSearchResults, clearSearchResults, hasResults } =
     useSearchResults();
@@ -42,24 +69,59 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
   const [selectedCategories, setSelectedCategories] = useState<string[]>(
     searchState.selectedCategories
   );
-  const [recommendations, setRecommendations] = useState<Recommendation[]>(
-    searchState.recommendations
-  );
-
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const itemsPerPage = 9;
+
+  const {
+    currentPage: safeCurrentPage,
+    setCurrentPage,
+    totalPages,
+    paginatedItems: paginatedRecommendations,
+  } = usePagination(recommendations, 9);
 
   useEffect(() => {
+    console.log("=== SEARCH STATE SYNC ===");
+    console.log("hasResults:", hasResults);
+    console.log("searchState:", searchState);
     if (hasResults) {
+      console.log("Syncing with cached search state...");
+      console.log("Cached recommendations:", searchState.recommendations);
       setDestination(searchState.destination);
       setPreferences(searchState.preferences);
       setSelectedCategories(searchState.selectedCategories);
       setRecommendations(searchState.recommendations);
     }
+    console.log("=== END SEARCH STATE SYNC ===");
   }, [searchState, hasResults]);
+
+  useEffect(() => {
+    console.log("=== RECOMMENDATIONS STATE CHANGED ===");
+    console.log("Count:", recommendations?.length || 0);
+    console.log("First item:", recommendations?.[0]);
+    console.log("All names:", recommendations?.map((r) => r?.name) || []);
+    console.log("=== END STATE CHANGE ===");
+  }, [recommendations]);
+
+  useEffect(() => {
+    console.log("=== COMPONENT RE-RENDER ===");
+    console.log("Current recommendations count:", recommendations.length);
+    console.log("Is loading:", isLoading);
+    console.log("Current destination:", destination);
+    console.log("=== END RE-RENDER ===");
+  });
+
+  useEffect(() => {
+    console.log("=== PAGINATION DEBUG ===");
+    console.log("Total recommendations:", recommendations.length);
+    console.log("Items per page:", 9);
+    console.log("Current page:", safeCurrentPage);
+    console.log("Total pages:", totalPages);
+    console.log("Paginated items:", paginatedRecommendations.length);
+    console.log("Paginated recommendations:", paginatedRecommendations);
+    console.log("=== END PAGINATION DEBUG ===");
+  }, [recommendations, safeCurrentPage, paginatedRecommendations]);
 
   const categories = [
     "restaurants",
@@ -76,13 +138,12 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
   ];
 
   const handleSearch = async () => {
-    if (!destination.trim()) {
-      setError("Please enter a destination");
-      return;
-    }
+    console.log("=== HANDLE SEARCH START ===");
+    console.log("Destination:", destination);
+    console.log("Selected Categories:", selectedCategories);
 
     setIsLoading(true);
-    setError(null);
+    setRecommendations([]);
 
     try {
       const userPreferences = {
@@ -97,28 +158,26 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
         departureDate: undefined,
       };
 
+      console.log("🔍 Calling service with preferences:", userPreferences);
+
+      // Use the QlooApiService instance directly
       const results = await qlooService.getEnhancedRecommendations(
         userPreferences
       );
 
-      setRecommendations(results);
-      updateSearchResults(
-        destination,
-        preferences,
-        selectedCategories,
-        results
+      console.log("=== SERVICE RETURNED ===");
+      console.log("Results count:", results.length);
+      console.log("First result:", results[0]);
+      console.log(
+        "All names:",
+        results.map((r) => r.name)
       );
-      setCurrentPage(1);
+      console.log("=== END SERVICE RESULTS ===");
 
-      if (results.length === 0) {
-        setError(
-          "No recommendations found. Try different preferences or destination."
-        );
-      }
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to get recommendations"
-      );
+      setRecommendations(results);
+    } catch (error) {
+      console.error("❌ Error in handleSearch:", error);
+      setRecommendations([]);
     } finally {
       setIsLoading(false);
     }
@@ -130,7 +189,6 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
     setPreferences("");
     setSelectedCategories([]);
     setRecommendations([]);
-    setCurrentPage(1);
     setError(null);
   };
 
@@ -141,13 +199,6 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
         : [...prev, category]
     );
   };
-
-  const paginatedRecommendations = recommendations.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-
-  const totalPages = Math.ceil(recommendations.length / itemsPerPage);
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
@@ -240,172 +291,25 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
                 Categories (optional)
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
-                {[
-                  {
-                    id: "restaurants",
-                    label: "Restaurant",
-                    icon: "🍽️",
-                    color: "bg-purple-50 border-purple-200",
-                  },
-                  {
-                    id: "hotels",
-                    label: "Hotel",
-                    icon: "🏨",
-                    color: "bg-red-50 border-red-200",
-                  },
-                  {
-                    id: "attractions",
-                    label: "Attraction",
-                    icon: "🎯",
-                    color: "bg-blue-50 border-blue-200",
-                  },
-                  {
-                    id: "museums",
-                    label: "Museum",
-                    icon: "🏛️",
-                    color: "bg-gray-50 border-gray-200",
-                  },
-                  {
-                    id: "parks",
-                    label: "Park",
-                    icon: "🌲",
-                    color: "bg-green-50 border-green-200",
-                  },
-                  {
-                    id: "entertainment",
-                    label: "Entertainment",
-                    icon: "🎭",
-                    color: "bg-orange-50 border-orange-200",
-                  },
-                  {
-                    id: "shopping",
-                    label: "Shopping",
-                    icon: "🛍️",
-                    color: "bg-blue-50 border-blue-200",
-                  },
-                  {
-                    id: "cafes",
-                    label: "Cafe",
-                    icon: "☕",
-                    color: "bg-brown-50 border-brown-200",
-                  },
-                  {
-                    id: "food",
-                    label: "Food",
-                    icon: "🍕",
-                    color: "bg-orange-50 border-orange-200",
-                  },
-                  {
-                    id: "history",
-                    label: "History",
-                    icon: "📚",
-                    color: "bg-indigo-50 border-indigo-200",
-                  },
-                  {
-                    id: "culture",
-                    label: "Culture",
-                    icon: "🎨",
-                    color: "bg-pink-50 border-pink-200",
-                  },
-                ].map((category) => (
+                {[...categories].map((category) => (
                   <label
-                    key={category.id}
-                    className={`
-                      relative flex items-center space-x-2 sm:space-x-3 p-2 sm:p-3 lg:p-4 rounded-lg sm:rounded-xl cursor-pointer transition-all duration-200 border-2
-                      ${
-                        selectedCategories.includes(category.id)
-                          ? "bg-blue-50 border-blue-400 shadow-md transform scale-[1.02]"
-                          : `${category.color} hover:shadow-sm hover:transform hover:scale-[1.01]`
-                      }
-                    `}
+                    key={category}
+                    className={`relative flex items-center space-x-2 sm:space-x-3 p-2 sm:p-3 lg:p-4 rounded-lg sm:rounded-xl cursor-pointer transition-all duration-200 border-2 ${
+                      selectedCategories.includes(category)
+                        ? "bg-blue-50 border-blue-400 shadow-md transform scale-[1.02]"
+                        : "bg-gray-50 border-gray-200 hover:shadow-sm hover:transform hover:scale-[1.01]"
+                    }`}
                   >
-                    <div className="relative">
-                      <input
-                        type="checkbox"
-                        checked={selectedCategories.includes(category.id)}
-                        onChange={() => toggleCategory(category.id)}
-                        className="sr-only"
-                      />
-                      <div
-                        className={`
-                        w-4 h-4 sm:w-5 sm:h-5 rounded border-2 flex items-center justify-center transition-all duration-200
-                        ${
-                          selectedCategories.includes(category.id)
-                            ? "bg-blue-500 border-blue-500"
-                            : "bg-white border-gray-300"
-                        }
-                      `}
-                      >
-                        {selectedCategories.includes(category.id) && (
-                          <svg
-                            className="w-2 h-2 sm:w-3 sm:h-3 text-white"
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path
-                              fillRule="evenodd"
-                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                        )}
-                      </div>
-                    </div>
-
-                    <span className="text-base sm:text-lg lg:text-xl">
-                      {category.icon}
-                    </span>
-
-                    <span
-                      className={`text-xs sm:text-sm font-medium ${
-                        selectedCategories.includes(category.id)
-                          ? "text-blue-800"
-                          : "text-gray-700"
-                      }`}
-                    >
-                      {category.label}
-                    </span>
+                    <input
+                      type="checkbox"
+                      checked={selectedCategories.includes(category)}
+                      onChange={() => toggleCategory(category)}
+                      className="sr-only"
+                    />
+                    <span className="text-sm sm:text-base">{category}</span>
                   </label>
                 ))}
               </div>
-
-              {selectedCategories.length > 0 && (
-                <div className="mt-3 sm:mt-4 p-2 sm:p-3 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="flex flex-wrap gap-1 sm:gap-2">
-                    {selectedCategories.map((categoryId) => {
-                      const category = [
-                        { id: "restaurants", label: "Restaurant", icon: "🍽️" },
-                        { id: "hotels", label: "Hotel", icon: "🏨" },
-                        { id: "attractions", label: "Attraction", icon: "🎯" },
-                        { id: "museums", label: "Museum", icon: "🏛️" },
-                        { id: "parks", label: "Park", icon: "🌲" },
-                        {
-                          id: "entertainment",
-                          label: "Entertainment",
-                          icon: "🎭",
-                        },
-                        { id: "shopping", label: "Shopping", icon: "🛍️" },
-                        { id: "cafes", label: "Cafe", icon: "☕" },
-                        { id: "food", label: "Food", icon: "🍕" },
-                        { id: "history", label: "History", icon: "📚" },
-                        { id: "culture", label: "Culture", icon: "🎨" },
-                      ].find((cat) => cat.id === categoryId);
-
-                      return category ? (
-                        <span
-                          key={categoryId}
-                          className="inline-flex items-center gap-1 px-2 py-1 bg-white rounded-md text-xs sm:text-sm font-medium text-blue-800 border border-blue-300"
-                        >
-                          <span className="text-xs sm:text-sm">
-                            {category.icon}
-                          </span>
-                          <span>{category.label}</span>
-                        </span>
-                      ) : null;
-                    })}
-                  </div>
-                </div>
-              )}
             </div>
 
             <Button
@@ -435,53 +339,164 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
         </Card>
 
         {recommendations.length > 0 && (
-          <div className="space-y-3 sm:space-y-4 lg:space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-800">
+          <div className="space-y-6">
+            {/* Add debugging info */}
+            {/* <div className="bg-yellow-100 border border-yellow-400 p-4 rounded">
+              <h3 className="font-bold">Debug Info:</h3>
+              <p>Total recommendations: {recommendations.length}</p>
+              <p>Current page: {safeCurrentPage}</p>
+              <p>Items per page: 9</p>
+              <p>
+                Paginated recommendations: {paginatedRecommendations.length}
+              </p>
+              <p>First recommendation: {recommendations[0]?.name || "None"}</p>
+            </div> */}
+
+            {/* Your existing pagination header */}
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold text-gray-800">
                 Recommendations for {destination}
               </h2>
-              <div className="text-xs sm:text-sm text-gray-600">
+              <span className="text-sm text-gray-600">
                 {recommendations.length} places found
+              </span>
+            </div>
+
+            {/* Add debugging for paginated results */}
+            {paginatedRecommendations.length === 0 ? (
+              <div className="bg-red-100 border border-red-400 p-4 rounded">
+                <p>No paginated recommendations to display</p>
+                <p>Total recommendations: {recommendations.length}</p>
+                <p>Current page: {safeCurrentPage}</p>
               </div>
-            </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {paginatedRecommendations.map((recommendation, index) => {
+                  console.log(
+                    `Rendering recommendation ${index}:`,
+                    recommendation
+                  );
+                  return (
+                    <div
+                      key={recommendation.id}
+                      className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300 border border-gray-200"
+                    >
+                      {/* Image */}
+                      <div className="h-48 bg-gray-200 relative overflow-hidden">
+                        <img
+                          src={
+                            recommendation.image ||
+                            "https://via.placeholder.com/300x200/e2e8f0/64748b?text=Travel+Spot"
+                          }
+                          alt={recommendation.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.src =
+                              "https://via.placeholder.com/300x200/e2e8f0/64748b?text=Travel+Spot";
+                          }}
+                        />
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-              {paginatedRecommendations.map((recommendation) => (
-                <SpotCard
-                  key={recommendation.id}
-                  spot={recommendation}
-                  onAddToItinerary={onAddToItinerary}
-                />
-              ))}
-            </div>
+                        {/* Type Badge */}
+                        <div className="absolute top-3 left-3">
+                          <span className="px-2 py-1 bg-white bg-opacity-90 rounded-full text-xs font-medium text-gray-700 capitalize">
+                            {recommendation.type}
+                          </span>
+                        </div>
+                      </div>
 
+                      {/* Content */}
+                      <div className="p-4">
+                        {/* Title and Rating */}
+                        <div className="flex justify-between items-start mb-2">
+                          <h3 className="font-bold text-lg text-gray-900 line-clamp-2">
+                            {recommendation.name}
+                          </h3>
+                          <div className="flex items-center ml-2">
+                            <span className="text-yellow-400">⭐</span>
+                            <span className="text-sm font-medium text-gray-700 ml-1">
+                              {recommendation.rating?.toFixed(1) || "4.0"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Description */}
+                        <p className="text-gray-600 text-sm mb-3 line-clamp-2">
+                          {recommendation.description}
+                        </p>
+
+                        {/* Address */}
+                        <p className="text-gray-500 text-xs mb-3 flex items-center">
+                          <span className="mr-1">📍</span>
+                          {recommendation.address}
+                        </p>
+
+                        {/* Tags */}
+                        {recommendation.tags &&
+                          recommendation.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-3">
+                              {recommendation.tags
+                                .slice(0, 3)
+                                .map((tag, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
+                                  >
+                                    {tag}
+                                  </span>
+                                ))}
+                            </div>
+                          )}
+
+                        {/* Add to Itinerary Button */}
+                        <button
+                          onClick={() => onAddToItinerary?.(recommendation)}
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
+                        >
+                          Add to Itinerary
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Your existing pagination controls */}
             {totalPages > 1 && (
-              <div className="flex justify-center items-center space-x-2">
-                <Button
+              <div className="flex justify-center items-center space-x-2 mt-6">
+                <button
+                  onClick={() => {
+                    console.log("Previous clicked, current page:", currentPage);
+                    setCurrentPage((prev) => {
+                      const newPage = Math.max(prev - 1, 1);
+                      console.log("Setting page to:", newPage);
+                      return newPage;
+                    });
+                  }}
                   disabled={currentPage === 1}
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.max(1, prev - 1))
-                  }
-                  className="text-xs sm:text-sm"
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Previous
-                </Button>
-                <span className="text-xs sm:text-sm text-gray-600 px-2">
+                </button>
+
+                <span className="px-4 py-2 text-sm text-gray-700">
                   Page {currentPage} of {totalPages}
                 </span>
-                <Button
+
+                <button
+                  onClick={() => {
+                    console.log("Next clicked, current page:", currentPage);
+                    setCurrentPage((prev) => {
+                      const newPage = Math.min(prev + 1, totalPages);
+                      console.log("Setting page to:", newPage);
+                      return newPage;
+                    });
+                  }}
                   disabled={currentPage === totalPages}
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.min(totalPages, prev + 1))
-                  }
-                  className="text-xs sm:text-sm"
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Next
-                </Button>
+                </button>
               </div>
             )}
           </div>
