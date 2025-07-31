@@ -58,6 +58,9 @@ export interface QlooInsight {
 }
 
 export class QlooApiService {
+  testQlooInsightsAPI(): boolean | PromiseLike<boolean> {
+    throw new Error("Method not implemented.");
+  }
   private apiRoute = "/api/qloo";
 
   async getRecommendations(
@@ -146,6 +149,10 @@ export class QlooApiService {
         destination,
         preferences,
         selectedCategories: options.categories || [],
+        numberOfDays: 0,
+        budget: "low",
+        travelStyle: "solo",
+        interests: [],
       });
     }
   }
@@ -153,181 +160,75 @@ export class QlooApiService {
   private generateFallbackRecommendations(
     preferences: UserPreferences
   ): Recommendation[] {
-    console.log("Generating fallback recommendations for:", preferences);
+    console.log("=== Generating Fallback Recommendations ===");
 
-    const { destination, selectedCategories } = preferences;
+    const destination = preferences.destination || "your destination";
+    const categories = preferences.selectedCategories || ["attractions"];
 
-    // Enhanced fallback data with better coverage
-    const fallbackData: Array<{
-      name: string;
-      type: string;
-      description: string;
-      category: string;
-    }> = [
-      // Restaurants & Food
-      {
-        name: `Traditional ${destination} Restaurant`,
-        type: "restaurant",
-        description: "Authentic local cuisine and specialties",
-        category: "restaurants",
-      },
-      {
-        name: `${destination} Food Market`,
-        type: "restaurant",
-        description: "Traditional food market with local vendors",
-        category: "food",
-      },
-      {
-        name: `${destination} Street Food District`,
-        type: "restaurant",
-        description: "Popular street food area",
-        category: "food",
-      },
+    return categories
+      .flatMap((category, categoryIndex) => {
+        const categoryConfig = this.getCategoryFallbackData(
+          category,
+          destination
+        );
 
-      // History & Culture
-      {
-        name: `${destination} Historical Museum`,
-        type: "museum",
-        description: "Local history and cultural artifacts",
-        category: "history",
-      },
-      {
-        name: `${destination} Cultural Center`,
-        type: "museum",
-        description: "Traditional arts and cultural exhibitions",
-        category: "culture",
-      },
-      {
-        name: `Historic Quarter of ${destination}`,
-        type: "attraction",
-        description: "Well-preserved historical district",
-        category: "history",
-      },
-      {
-        name: `${destination} Art Gallery`,
-        type: "museum",
-        description: "Local and contemporary art collections",
-        category: "culture",
-      },
+        return categoryConfig.map((item, index) => ({
+          id: `fallback-${categoryIndex}-${index}`,
+          name: item.name,
+          type: category as any,
+          image:
+            "https://via.placeholder.com/300x200/e2e8f0/64748b?text=Discover+More",
+          rating: 4.2 + Math.random() * 0.6,
+          address: `${destination}`,
+          description: item.description,
+          tags: [destination.toLowerCase(), category, "discover"],
+          coordinates: undefined,
+          qlooScore: 0.8 + Math.random() * 0.2,
+        }));
+      })
+      .slice(0, 8);
+  }
 
-      // Attractions
-      {
-        name: `${destination} Historic Center`,
-        type: "attraction",
-        description: "Historic city center with landmarks",
-        category: "attractions",
-      },
-      {
-        name: `${destination} Landmark`,
-        type: "attraction",
-        description: "Iconic city landmark",
-        category: "attractions",
-      },
+  private getCategoryFallbackData(category: string, destination: string) {
+    const fallbackMap: Record<
+      string,
+      Array<{ name: string; description: string }>
+    > = {
+      museums: [
+        {
+          name: `${destination} National Museum`,
+          description: `Explore the rich history and culture of ${destination} through fascinating exhibits and artifacts.`,
+        },
+        {
+          name: `${destination} Art Gallery`,
+          description: `Discover contemporary and classical artworks from local and international artists.`,
+        },
+        {
+          name: `${destination} Archaeological Museum`,
+          description: `Journey through ancient civilizations and archaeological discoveries in ${destination}.`,
+        },
+      ],
+      // Add more categories as needed...
+    };
 
-      // Hotels
-      {
-        name: `Heritage Hotel ${destination}`,
-        type: "hotel",
-        description: "Historic luxury accommodation",
-        category: "hotels",
-      },
-
-      // Entertainment
-      {
-        name: `${destination} Cultural Theater`,
-        type: "entertainment",
-        description: "Traditional performances and shows",
-        category: "entertainment",
-      },
-
-      // Shopping
-      {
-        name: `${destination} Artisan Market`,
-        type: "shopping",
-        description: "Local crafts and artisan products",
-        category: "shopping",
-      },
-
-      // Museums
-      {
-        name: `${destination} National Museum`,
-        type: "museum",
-        description: "National history and culture museum",
-        category: "museums",
-      },
-
-      // Parks
-      {
-        name: `${destination} Heritage Park`,
-        type: "park",
-        description: "Historic park with cultural significance",
-        category: "parks",
-      },
-
-      // Nightlife
-      {
-        name: `${destination} Cultural District`,
-        type: "entertainment",
-        description: "Evening cultural activities and venues",
-        category: "nightlife",
-      },
-
-      // Cafes
-      {
-        name: `Traditional ${destination} Cafe`,
-        type: "cafe",
-        description: "Historic coffee house with local atmosphere",
-        category: "cafes",
-      },
-
-      // Activities
-      {
-        name: `${destination} Cultural Tour`,
-        type: "activity",
-        description: "Guided historical and cultural tour",
-        category: "activities",
-      },
-    ];
-
-    // Filter based on selected categories, or show all if none selected
-    const filteredData =
-      selectedCategories.length > 0
-        ? fallbackData.filter((item) =>
-            selectedCategories.includes(item.category)
-          )
-        : fallbackData;
-
-    return filteredData.slice(0, 12).map((item, index) => ({
-      id: `fallback-${Date.now()}-${index}`,
-      name: item.name,
-      type: item.type,
-      image:
-        "https://via.placeholder.com/300x200/e2e8f0/64748b?text=Travel+Spot",
-      rating: 4.0 + Math.random(),
-      address: `${destination}`,
-      description: item.description,
-      tags: [item.category, destination.toLowerCase(), "local"],
-    }));
+    return (
+      fallbackMap[category] || [
+        {
+          name: `Popular ${category} in ${destination}`,
+          description: `Discover amazing ${category} experiences in ${destination}.`,
+        },
+      ]
+    );
   }
 
   private transformQlooSearchData(
     qlooData: any,
     preferences: UserPreferences
   ): Recommendation[] {
-    console.log("=== Transform Qloo Data Debug ===");
-    console.log("Input data structure:", {
-      hasResults: !!qlooData?.results,
-      resultsIsArray: Array.isArray(qlooData?.results),
-      resultCount: qlooData?.results?.length || 0,
-    });
+    console.log("=== Transform Qloo Data START ===");
 
     if (!qlooData?.results || !Array.isArray(qlooData.results)) {
       console.error("❌ Invalid results structure");
-      return [];
-    }
-
-    if (qlooData.results.length === 0) {
-      console.log("❌ Empty results array");
       return [];
     }
 
@@ -337,82 +238,94 @@ export class QlooApiService {
 
     for (let i = 0; i < qlooData.results.length; i++) {
       const item = qlooData.results[i];
-      console.log(
-        `\n=== Processing item ${i + 1}/${qlooData.results.length} ===`
-      );
-      console.log("Item:", JSON.stringify(item, null, 2));
+
+      // **FILTER OUT GENERIC CATEGORY RESULTS**
+      if (this.isGenericCategoryResult(item)) {
+        console.log(`⚠️ Skipping generic category: ${item.name}`);
+        continue;
+      }
 
       try {
-        // Extract basic data with extensive logging
-        const name = item.name || `Location ${i + 1}`;
-        console.log("✅ Name:", name);
-
-        const description =
-          item.properties?.description ||
-          `Visit ${name} in ${preferences.destination}`;
-        console.log("✅ Description:", description);
-
-        const image =
-          item.properties?.image?.url ||
-          "https://via.placeholder.com/300x200/e2e8f0/64748b?text=Travel+Spot";
-        console.log("✅ Image:", image);
-
-        const rating =
-          item.properties?.business_rating ||
-          (item.popularity ? Number((item.popularity * 5).toFixed(1)) : 4.0);
-        console.log("✅ Rating:", rating);
-
-        const address =
-          item.properties?.address ||
-          item.properties?.geocode?.city ||
-          preferences.destination;
-        console.log("✅ Address:", address);
-
-        const coordinates = item.location
-          ? {
-              lat: item.location.lat || 0,
-              lng: item.location.lon || item.location.lng || 0,
-            }
-          : undefined;
-        console.log("✅ Coordinates:", coordinates);
-
-        // Simple type mapping
-        const primaryType = item.types?.[0] || "attraction";
-        const type = primaryType.includes("place")
-          ? "restaurant"
-          : "attraction";
-        console.log("✅ Type:", type, "from", primaryType);
-
-        // Simple tags
-        const tags = [preferences.destination.toLowerCase(), type, "qloo"];
-        console.log("✅ Tags:", tags);
-
         const recommendation: Recommendation = {
           id: item.entity_id || `qloo-${Date.now()}-${i}`,
-          name,
-          type,
-          image,
-          rating,
-          address,
-          description,
-          tags,
-          coordinates,
+          name: item.name || `Location ${i + 1}`,
+          type: this.mapQlooType(item.types?.[0] || "attraction"),
+          image:
+            item.properties?.image?.url ||
+            "https://via.placeholder.com/300x200/e2e8f0/64748b?text=Travel+Spot",
+          rating:
+            item.properties?.business_rating ||
+            (item.popularity ? Number((item.popularity * 5).toFixed(1)) : 4.0),
+          address:
+            item.properties?.address ||
+            item.properties?.geocode?.city ||
+            preferences.destination,
+          description:
+            item.properties?.description ||
+            `Visit ${item.name} in ${preferences.destination}`,
+          tags: [preferences.destination.toLowerCase(), "qloo"],
+          coordinates: item.location
+            ? {
+                lat: item.location.lat || 0,
+                lng: item.location.lon || item.location.lng || 0,
+              }
+            : undefined,
           qlooScore: item.popularity,
         };
 
-        console.log("✅ Created recommendation:", recommendation);
         recommendations.push(recommendation);
+        console.log(`✅ Added real place: ${recommendation.name}`);
       } catch (itemError) {
         console.error(`❌ Error processing item ${i}:`, itemError);
-        console.log("Problematic item:", item);
       }
     }
 
-    console.log(`\n=== Transform Complete ===`);
-    console.log("Successfully transformed:", recommendations.length, "items");
-    console.log("Sample result:", recommendations[0]);
-
+    console.log(
+      `✅ Transform Complete: ${recommendations.length} real places (filtered out generic categories)`
+    );
     return recommendations;
+  }
+
+  private isGenericCategoryResult(item: any): boolean {
+    // Check if it's a Wikipedia category tag
+    if (item.types?.includes("urn:tag:wikipedia_category:wikidata")) {
+      return true;
+    }
+
+    // Check if it's just a tag without real place properties
+    if (
+      item.types?.includes("urn:tag") &&
+      !item.properties?.address &&
+      !item.properties?.geocode
+    ) {
+      return true;
+    }
+
+    // Check for generic category names
+    const genericPatterns = [
+      /museums? in /i,
+      /restaurants? in /i,
+      /hotels? in /i,
+      /attractions? in /i,
+      /galleries? in /i,
+      /art museums? and galleries? in /i,
+      /history museums? in /i,
+      /biographical museums? in /i,
+      /religious museums? in /i,
+      /museums? of .+ in /i,
+    ];
+
+    const name = item.name || "";
+    if (genericPatterns.some((pattern) => pattern.test(name))) {
+      return true;
+    }
+
+    // Check if properties object is empty or missing key location data
+    if (!item.properties || Object.keys(item.properties).length === 0) {
+      return true;
+    }
+
+    return false;
   }
 
   async tryQlooSearch(
@@ -434,16 +347,13 @@ export class QlooApiService {
         }),
       });
 
-      console.log("📥 API Route Response status:", response.status);
-
       if (!response.ok) {
         const errorData = await response.json();
         console.error("❌ API Route Error:", errorData);
-        return [];
+        return []; // Return empty array, not fallback
       }
 
       const data = await response.json();
-      console.log("📊 API Route Response data:", JSON.stringify(data, null, 2));
 
       if (
         data &&
@@ -462,16 +372,15 @@ export class QlooApiService {
         );
         console.log("🔍 First transformed result:", transformed[0]);
 
-        // **KEY FIX**: Return transformed data even if empty, don't fall back here
+        // ✅ CRITICAL: Return the transformed data here
         return transformed;
       } else {
         console.log("❌ No valid results in response");
-        console.log("Response structure:", Object.keys(data || {}));
-        return [];
+        return []; // Return empty array, not fallback
       }
     } catch (error) {
       console.error("❌ Network/Fetch Error:", error);
-      return [];
+      return []; // Return empty array, not fallback
     }
   }
 
@@ -488,25 +397,35 @@ export class QlooApiService {
 
     const destination = preferences.destination.trim();
     console.log("🎯 Destination:", destination);
+    console.log("🎯 Selected Categories:", preferences.selectedCategories);
 
-    // **SIMPLIFIED STRATEGY**: Try fewer, more targeted searches first
-    const searchStrategies = [
-      // Strategy 1: Simple category-based searches
-      `restaurants ${destination}`,
-      `hotels ${destination}`,
-      `attractions ${destination}`,
-      `museums ${destination}`,
+    // **IMPROVED CATEGORY-SPECIFIC SEARCH STRATEGIES**
+    const searchStrategies: string[] = [];
 
-      // Strategy 2: Try with selected categories
-      ...preferences.selectedCategories.map(
-        (category) => `${category} ${destination}`
-      ),
+    // Strategy 1: Build very specific queries for each selected category
+    if (
+      preferences.selectedCategories &&
+      preferences.selectedCategories.length > 0
+    ) {
+      preferences.selectedCategories.forEach((category) => {
+        const categoryQueries = this.getCategorySpecificQueries(
+          category,
+          destination
+        );
+        searchStrategies.push(...categoryQueries);
+      });
+    }
 
-      // Strategy 3: Simple destination search as fallback
-      destination,
-    ];
+    // Strategy 2: Fallback general searches
+    searchStrategies.push(
+      `attractions in ${destination}`,
+      `places to visit ${destination}`,
+      `tourist spots ${destination}`,
+      destination
+    );
 
     console.log("🎯 Total search strategies:", searchStrategies.length);
+    console.log("🎯 Search strategies:", searchStrategies);
 
     // Try each search strategy
     for (const [index, query] of searchStrategies.entries()) {
@@ -520,16 +439,287 @@ export class QlooApiService {
       );
 
       if (results.length > 0) {
-        // **REMOVE FILTERING FOR NOW** - Let's see all results first
-        console.log(
-          `✅ Returning ${results.length} results from strategy ${index + 1}`
+        // **FILTER RESULTS BY SELECTED CATEGORIES**
+        const filteredResults = this.filterResultsByCategories(
+          results,
+          preferences.selectedCategories
         );
-        return results.slice(0, 12);
+
+        if (filteredResults.length > 0) {
+          console.log(
+            `✅ SUCCESS: Returning ${
+              filteredResults.length
+            } filtered results from strategy ${index + 1}`
+          );
+          return filteredResults.slice(0, 12);
+        } else {
+          console.log(
+            `⚠️ Strategy ${
+              index + 1
+            } returned results but none matched selected categories`
+          );
+        }
       }
     }
 
-    console.warn("❌ All Qloo API strategies returned empty, using fallback");
+    console.warn("❌ All Qloo API strategies failed, using fallback");
     return this.generateFallbackRecommendations(preferences);
+  }
+
+  private getCategorySpecificQueries(
+    category: string,
+    destination: string
+  ): string[] {
+    const queryMap: Record<string, string[]> = {
+      museums: [
+        // Try to get specific museum names, not categories
+        `famous museums ${destination}`,
+        `top museums ${destination}`,
+        `best museums to visit ${destination}`,
+        `museum attractions ${destination}`,
+        `national museum ${destination}`,
+        `archaeological museum ${destination}`,
+        `art museum ${destination}`,
+      ],
+      restaurants: [
+        `best restaurants ${destination}`,
+        `top restaurants ${destination}`,
+        `fine dining ${destination}`,
+        `local restaurants ${destination}`,
+        `popular restaurants ${destination}`,
+      ],
+      hotels: [
+        `luxury hotels ${destination}`,
+        `best hotels ${destination}`,
+        `top hotels ${destination}`,
+        `boutique hotels ${destination}`,
+        `accommodation ${destination}`,
+      ],
+      attractions: [
+        `top attractions ${destination}`,
+        `must see ${destination}`,
+        `famous landmarks ${destination}`,
+        `tourist attractions ${destination}`,
+        `best places to visit ${destination}`,
+      ],
+      parks: [
+        `national parks ${destination}`,
+        `public parks ${destination}`,
+        `botanical gardens ${destination}`,
+        `green spaces ${destination}`,
+        `outdoor attractions ${destination}`,
+      ],
+      entertainment: [
+        `entertainment venues ${destination}`,
+        `theaters ${destination}`,
+        `nightlife ${destination}`,
+        `live music ${destination}`,
+        `entertainment attractions ${destination}`,
+      ],
+      shopping: [
+        `shopping centers ${destination}`,
+        `markets ${destination}`,
+        `shopping districts ${destination}`,
+        `boutique shopping ${destination}`,
+        `local markets ${destination}`,
+      ],
+      cafes: [
+        `best cafes ${destination}`,
+        `coffee shops ${destination}`,
+        `local cafes ${destination}`,
+        `specialty coffee ${destination}`,
+        `cafe culture ${destination}`,
+      ],
+      food: [
+        `local cuisine ${destination}`,
+        `food markets ${destination}`,
+        `street food ${destination}`,
+        `culinary experiences ${destination}`,
+        `traditional food ${destination}`,
+      ],
+      history: [
+        `historical sites ${destination}`,
+        `ancient sites ${destination}`,
+        `historical landmarks ${destination}`,
+        `heritage sites ${destination}`,
+        `archaeological sites ${destination}`,
+      ],
+      culture: [
+        `cultural attractions ${destination}`,
+        `cultural sites ${destination}`,
+        `cultural experiences ${destination}`,
+        `traditional culture ${destination}`,
+        `local culture ${destination}`,
+      ],
+    };
+
+    return queryMap[category] || [`${category} attractions ${destination}`];
+  }
+
+  private filterResultsByCategories(
+    results: Recommendation[],
+    selectedCategories: string[]
+  ): Recommendation[] {
+    if (!selectedCategories || selectedCategories.length === 0) {
+      return results; // Return all results if no categories selected
+    }
+
+    return results.filter((result) => {
+      // Check if the result type matches any selected category
+      const resultType = result.type.toLowerCase();
+      const resultName = result.name.toLowerCase();
+      const resultDescription = result.description.toLowerCase();
+      const resultTags = result.tags?.map((tag) => tag.toLowerCase()) || [];
+
+      return selectedCategories.some((category) => {
+        const categoryLower = category.toLowerCase();
+
+        // Direct type matching
+        if (this.isMatchingCategory(resultType, categoryLower)) {
+          return true;
+        }
+
+        // Check name for category keywords
+        if (resultName.includes(categoryLower)) {
+          return true;
+        }
+
+        // Check description for category keywords
+        if (resultDescription.includes(categoryLower)) {
+          return true;
+        }
+
+        // Check tags for category match
+        if (resultTags.some((tag) => tag.includes(categoryLower))) {
+          return true;
+        }
+
+        // Check for category-specific keywords
+        return this.containsCategoryKeywords(result, categoryLower);
+      });
+    });
+  }
+
+  private isMatchingCategory(resultType: string, category: string): boolean {
+    const categoryMapping: Record<string, string[]> = {
+      restaurants: ["restaurant", "dining", "food", "cafe", "bar"],
+      hotels: ["hotel", "accommodation", "lodging"],
+      attractions: ["attraction", "landmark", "sightseeing"],
+      museums: ["museum", "gallery", "cultural"],
+      parks: ["park", "garden", "outdoor"],
+      entertainment: ["entertainment", "theater", "show", "nightlife"],
+      shopping: ["shopping", "market", "retail", "store"],
+      cafes: ["cafe", "coffee"],
+      food: ["restaurant", "food", "dining", "cafe"],
+      history: ["museum", "historical", "heritage", "monument"],
+      culture: ["museum", "cultural", "art", "gallery"],
+    };
+
+    const validTypes = categoryMapping[category] || [category];
+    return validTypes.some((type) => resultType.includes(type));
+  }
+
+  private containsCategoryKeywords(
+    result: Recommendation,
+    category: string
+  ): boolean {
+    const keywordMap: Record<string, string[]> = {
+      museums: [
+        "museum",
+        "gallery",
+        "exhibition",
+        "art",
+        "collection",
+        "cultural center",
+      ],
+      parks: ["park", "garden", "green", "nature", "outdoor", "botanical"],
+      hotels: ["hotel", "inn", "resort", "lodge", "accommodation"],
+      attractions: [
+        "attraction",
+        "landmark",
+        "monument",
+        "tower",
+        "palace",
+        "castle",
+      ],
+      entertainment: ["theater", "cinema", "club", "bar", "nightlife", "show"],
+      shopping: ["shop", "market", "mall", "store", "boutique", "retail"],
+      history: [
+        "historical",
+        "heritage",
+        "ancient",
+        "old",
+        "traditional",
+        "historic",
+      ],
+    };
+
+    const keywords = keywordMap[category] || [category];
+    const searchText = `${result.name} ${
+      result.description
+    } ${result.tags?.join(" ")}`.toLowerCase();
+
+    return keywords.some((keyword) => searchText.includes(keyword));
+  }
+
+  private mapQlooType(type?: string): string {
+    if (!type) return "attraction";
+
+    const typeString = type.toLowerCase();
+
+    if (
+      typeString.includes("museum") ||
+      typeString.includes("gallery") ||
+      typeString.includes("exhibition")
+    ) {
+      return "museum";
+    }
+    if (
+      typeString.includes("park") ||
+      typeString.includes("garden") ||
+      typeString.includes("green")
+    ) {
+      return "park";
+    }
+    if (
+      typeString.includes("hotel") ||
+      typeString.includes("accommodation") ||
+      typeString.includes("lodging")
+    ) {
+      return "hotel";
+    }
+    if (
+      typeString.includes("restaurant") ||
+      typeString.includes("dining") ||
+      typeString.includes("food")
+    ) {
+      return "restaurant";
+    }
+    if (
+      typeString.includes("shop") ||
+      typeString.includes("market") ||
+      typeString.includes("retail")
+    ) {
+      return "shopping";
+    }
+    if (
+      typeString.includes("entertainment") ||
+      typeString.includes("theater") ||
+      typeString.includes("show")
+    ) {
+      return "entertainment";
+    }
+    if (typeString.includes("cafe") || typeString.includes("coffee")) {
+      return "cafe";
+    }
+
+    const typeMap: Record<string, string> = {
+      place: "restaurant",
+      destination: "attraction",
+      venue: "entertainment",
+    };
+
+    return typeMap[typeString] || "attraction";
   }
 }
 
@@ -657,7 +847,21 @@ export const testQlooInsightsAPI = async (): Promise<boolean> => {
 export const getRecommendations = async (
   preferences: UserPreferences
 ): Promise<Recommendation[]> => {
-  return qlooService.getEnhancedRecommendations(preferences);
+  console.log("=== getRecommendations EXPORT FUNCTION START ===");
+  console.log("Input preferences:", preferences);
+
+  const result = await qlooService.getEnhancedRecommendations(preferences);
+
+  console.log("=== getRecommendations EXPORT FUNCTION RESULT ===");
+  console.log("Result count:", result.length);
+  console.log("First result:", result[0]);
+  console.log(
+    "All result names:",
+    result.map((r) => r.name)
+  );
+  console.log("=== END EXPORT FUNCTION RESULT ===");
+
+  return result;
 };
 
 // Keep the other utility functions as they are
