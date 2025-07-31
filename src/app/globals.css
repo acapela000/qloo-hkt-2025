@@ -120,3 +120,48 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Custom checkbox styling */
+input[type="checkbox"] {
+  accent-color: #3b82f6; /* Primary color */
+}
+
+input[type="checkbox"]:checked {
+  background-color: #3b82f6;
+  border-color: #3b82f6;
+}
+
+/* Remove any default focus outlines on our custom checkboxes */
+input[type="checkbox"]:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+/* Add this to remove any default checkbox styling */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Category card hover effects */
+.category-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.category-card.selected {
+  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15);
+  border-color: #3b82f6;
+}
+
+/* Smooth hover animations */
+.category-checkbox:hover {
+  transform: translateY(-1px);
+}
