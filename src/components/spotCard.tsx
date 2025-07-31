@@ -23,6 +23,15 @@ interface SpotCardProps {
 }
 
 const SpotCard: React.FC<SpotCardProps> = ({ spot, onAddToItinerary }) => {
+  console.log("=== SPOTCARD RECEIVED DATA ===");
+  console.log("Spot name:", spot?.name);
+  console.log("Spot type:", spot?.type);
+  console.log("Spot description:", spot?.description);
+  console.log("Spot address:", spot?.address);
+  console.log("Spot image:", spot?.image);
+  console.log("Full spot object:", JSON.stringify(spot, null, 2));
+  console.log("=== END SPOTCARD DATA ===");
+
   const { favorites, addToFavorites, removeFromFavorites } = useFavorites();
   const isFavorite = favorites.some((fav) => fav.id === spot.id);
   const [imageError, setImageError] = useState(false);
