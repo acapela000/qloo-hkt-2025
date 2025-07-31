@@ -123,19 +123,19 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
     console.log("=== END PAGINATION DEBUG ===");
   }, [recommendations, safeCurrentPage, paginatedRecommendations]);
 
-  const categories = [
-    "restaurants",
-    "hotels",
-    "attractions",
-    "museums",
-    "parks",
-    "entertainment",
-    "shopping",
-    "cafes",
-    "food",
-    "history",
-    "culture",
-  ];
+  const categoryConfig = {
+    restaurants: { icon: "🍽️", label: "Restaurant" },
+    hotels: { icon: "🏨", label: "Hotel" },
+    attractions: { icon: "🎯", label: "Attraction" },
+    museums: { icon: "🏛️", label: "Museum" },
+    parks: { icon: "🌳", label: "Park" },
+    entertainment: { icon: "🎭", label: "Entertainment" },
+    shopping: { icon: "🛍️", label: "Shopping" },
+    cafes: { icon: "☕", label: "Cafe" },
+    food: { icon: "🍕", label: "Food" },
+    history: { icon: "📜", label: "History" },
+    culture: { icon: "🎨", label: "Culture" },
+  };
 
   const handleSearch = async () => {
     console.log("=== HANDLE SEARCH START ===");
@@ -250,26 +250,25 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
           <CardHeader className="pb-3 sm:pb-4">
             <CardTitle className="text-base sm:text-lg lg:text-xl flex items-center gap-2">
               <Search className="w-4 h-4 sm:w-5 sm:h-5 text-primary-600" />
-              Plan Your Journey
+              Paint your dream journey
+              <br />
+              Discover your next adventure with the artistic eyes of Van Gogh's
+              imagination
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 sm:space-y-4">
             <div className="space-y-2">
               <label className="text-xs sm:text-sm font-medium text-gray-700">
-                Where do you want to go? *
+                Destination *
               </label>
               <div className="relative">
                 <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <Input
+                <input
                   type="text"
-                  placeholder="e.g., Paris, Tokyo, New York..."
                   value={destination}
                   onChange={(e) => setDestination(e.target.value)}
-                  ith
-                  burgur
-                  menu
-                  butto
-                  className="pl-10 h-10 sm:h-12 text-sm sm:text-base"
+                  placeholder="Where do you want to go?"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
             </div>
@@ -279,37 +278,89 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
                 What are you looking for?
               </label>
               <textarea
-                placeholder="e.g., romantic restaurants, family-friendly activities, cultural experiences..."
                 value={preferences}
                 onChange={(e) => setPreferences(e.target.value)}
-                className="w-full min-h-[60px] sm:min-h-[80px] p-2 sm:p-3 text-sm sm:text-base border border-gray-300 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                placeholder="Tell us about your travel preferences..."
+                rows={3}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
               />
             </div>
 
-            <div className="space-y-3">
-              <label className="text-xs sm:text-sm font-medium text-gray-700">
-                Categories (optional)
+            <div className="space-y-4">
+              <label className="block text-lg font-semibold text-gray-800 mb-4">
+                Artistic Preferrences (Optional)
               </label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
-                {[...categories].map((category) => (
-                  <label
-                    key={category}
-                    className={`relative flex items-center space-x-2 sm:space-x-3 p-2 sm:p-3 lg:p-4 rounded-lg sm:rounded-xl cursor-pointer transition-all duration-200 border-2 ${
-                      selectedCategories.includes(category)
-                        ? "bg-blue-50 border-blue-400 shadow-md transform scale-[1.02]"
-                        : "bg-gray-50 border-gray-200 hover:shadow-sm hover:transform hover:scale-[1.01]"
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedCategories.includes(category)}
-                      onChange={() => toggleCategory(category)}
-                      className="sr-only"
-                    />
-                    <span className="text-sm sm:text-base">{category}</span>
-                  </label>
-                ))}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {Object.entries(categoryConfig).map(([category, config]) => {
+                  const isSelected = selectedCategories.includes(category);
+
+                  return (
+                    <button
+                      key={category}
+                      type="button"
+                      onClick={() => toggleCategory(category)}
+                      className={`
+                        relative p-4 border-2 transition-all duration-300 rounded-xl
+                        flex items-center space-x-3 min-h-[70px]
+                        ${
+                          isSelected
+                            ? "bg-gradient-to-r from-yellow-400 via-orange-400 to-blue-500 text-white border-transparent shadow-md transform scale-105"
+                            : "bg-white text-gray-700 border-gray-200 hover:border-gray-300 hover:shadow-sm"
+                        }
+                      `}
+                    >
+                      {/* Icon */}
+                      <span className="text-2xl flex-shrink-0">
+                        {config.icon}
+                      </span>
+
+                      {/* Label */}
+                      <span
+                        className={`
+                        font-medium text-left
+                        ${isSelected ? "text-white" : "text-gray-700"}
+                      `}
+                      >
+                        {config.label}
+                      </span>
+
+                      {/* Selection Indicator */}
+                      {isSelected && (
+                        <div className="absolute -top-2 -right-2 w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-md">
+                          <span className="text-blue-600 text-sm font-bold">
+                            ✓
+                          </span>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
+
+              {/* Selected Categories Summary */}
+              {selectedCategories.length > 0 && (
+                <div className="mt-4 p-4 bg-gradient-to-r from-yellow-50 to-blue-50 border border-yellow-200 rounded-xl">
+                  <p className="text-sm text-gray-600 mb-2">
+                    Selected: {selectedCategories.length} categor
+                    {selectedCategories.length === 1 ? "y" : "ies"}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedCategories.map((category) => {
+                      const config =
+                        categoryConfig[category as keyof typeof categoryConfig];
+                      return (
+                        <span
+                          key={category}
+                          className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-yellow-400 via-orange-400 to-blue-500 text-white text-sm font-medium rounded-full shadow-sm"
+                        >
+                          <span className="mr-1">{config.icon}</span>
+                          {config.label}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             <Button
@@ -325,7 +376,7 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
               ) : (
                 <>
                   <Search className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
-                  Find Recommendations
+                  Ready to create your masterpiece?
                 </>
               )}
             </Button>
@@ -450,9 +501,12 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
                         {/* Add to Itinerary Button */}
                         <button
                           onClick={() => onAddToItinerary?.(recommendation)}
-                          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
+                          className="w-full bg-gradient-to-r from-yellow-400 via-orange-400 to-blue-500 hover:from-yellow-500 hover:via-orange-500 hover:to-blue-600 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-300 transform hover:scale-105 hover:shadow-lg"
                         >
-                          Add to Itinerary
+                          <span className="flex items-center justify-center space-x-2">
+                            <span>✈️</span>
+                            <span>Add to Itinerary</span>
+                          </span>
                         </button>
                       </div>
                     </div>
