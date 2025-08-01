@@ -1,103 +1,368 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import React, { useState } from "react";
+import LandingPage from "@/components/LandingPage";
+import TravelItineraryApp from "@/components/TravelItineraryApp";
+import ProfilePage from "@/components/ProfilePage";
+import DashboardPage from "@/components/DiscoveryDashboard";
+import TripFolders from "@/components/TripFolders";
+import Navigation from "@/components/Navigation";
+import { FavoritesContent } from "@/components/TabContents";
+import {
+  Menu,
+  X,
+  Home as HomeIcon, // Rename the icon import to avoid conflict
+  Search,
+  MapPin,
+  Heart,
+  BarChart3,
+  User,
+} from "lucide-react";
+
+export default function HomePage() {
+  // Renamed from Home to HomePage
+  const [currentView, setCurrentView] = useState<
+    "landing" | "app" | "profile" | "dashboard" | "trips" | "favorites"
+  >("landing");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const handleGetStarted = () => {
+    setCurrentView("app");
+  };
+
+  const handleTabChange = (tab: string) => {
+    switch (tab) {
+      case "home":
+        setCurrentView("landing");
+        break;
+      case "discover":
+        setCurrentView("app");
+        break;
+      case "trips":
+        setCurrentView("trips");
+        break;
+      case "favorites":
+        setCurrentView("favorites");
+        break;
+      case "profile":
+        setCurrentView("profile");
+        break;
+      case "dashboard":
+        setCurrentView("dashboard");
+        break;
+      default:
+        setCurrentView("app");
+    }
+    // Close mobile menu after navigation
+    setIsMobileMenuOpen(false);
+  };
+
+  const getActiveTab = () => {
+    switch (currentView) {
+      case "landing":
+        return "home";
+      case "app":
+        return "discover";
+      case "trips":
+        return "trips";
+      case "favorites":
+        return "favorites";
+      case "profile":
+        return "profile";
+      case "dashboard":
+        return "dashboard";
+      default:
+        return "home";
+    }
+  };
+
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
+  const closeMobileMenu = () => {
+    setIsMobileMenuOpen(false);
+  };
+
+  // SEPARATE LANDING PAGE - No navigation
+  if (currentView === "landing") {
+    return <LandingPage onGetStarted={handleGetStarted} />;
+  }
+
+  // APP PAGES - With navigation
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="min-h-screen">
+      {/* DESKTOP NAVIGATION - Show on desktop only */}
+      <div className="hidden md:block">
+        <Navigation activeTab={getActiveTab()} onTabChange={handleTabChange} />
+      </div>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      {/* MOBILE STICKY NAVBAR - Show on mobile only */}
+      <div className="md:hidden">
+        {/* Mobile Top Navbar - Sticky */}
+        <div className="sticky top-0 z-40 bg-gradient-to-r from-yellow-100 via-green-100 to-blue-200 border-b border-gray-200 shadow-sm">
+          <div className="flex justify-between items-center px-4 py-3">
+            {/* Logo/Title */}
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 via-orange-500 to-blue-600 rounded-full flex items-center justify-center shadow-lg">
+                <div className="absolute w-8 h-8 bg-gradient-to-tr from-yellow-300/40 via-orange-400/30 to-blue-500/40 rounded-full"></div>
+                <span className="relative text-white font-bold text-sm drop-shadow-md">
+                  Q
+                </span>
+              </div>
+              <h1 className="text-lg font-bold bg-gradient-to-r from-blue-700 via-blue-600 to-blue-800 bg-clip-text text-transparent">
+                Trip Planner
+              </h1>
+            </div>
+
+            {/* SINGLE Burger Menu Button */}
+            <div
+              onClick={toggleMobileMenu}
+              className="relative w-12 h-10 rounded-xl bg-gradient-to-br from-yellow-400 via-orange-500 to-blue-600 shadow-lg hover:shadow-xl transition-all duration-300 ease-in-out transform hover:scale-105 cursor-pointer"
+            >
+              <div className="absolute inset-0 rounded-xl bg-gradient-to-tr from-yellow-300/30 via-orange-400/20 to-blue-500/30"></div>
+              <div className="relative flex items-center justify-center h-full">
+                {isMobileMenuOpen ? (
+                  <X className="w-5 h-5 text-white" />
+                ) : (
+                  <Menu className="w-5 h-5 text-white" />
+                )}
+              </div>
+            </div>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+
+        {/* Mobile Menu Overlay - Fixed content */}
+        {isMobileMenuOpen && (
+          <>
+            {/* Backdrop */}
+            <div
+              className="fixed inset-0 bg-black bg-opacity-50 z-40"
+              onClick={closeMobileMenu}
+            />
+
+            {/* Menu Panel - FIXED NAVIGATION CONTENT */}
+            <div className="fixed top-0 right-0 h-full w-80 bg-white shadow-xl z-50">
+              {/* Menu Header */}
+              <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-yellow-50 to-blue-50">
+                <h2 className="text-lg font-semibold text-gray-800">
+                  Navigation
+                </h2>
+                <div
+                  onClick={closeMobileMenu}
+                  className="p-2 hover:bg-gray-100 rounded-md cursor-pointer transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </div>
+              </div>
+
+              {/* NAVIGATION ITEMS - Not landing page content */}
+              <div className="flex flex-col p-4 space-y-2">
+                {/* Home - Using HomeIcon instead of Home */}
+                <div
+                  onClick={() => handleTabChange("home")}
+                  className={`
+                    flex items-center space-x-3 p-3 rounded-lg transition-colors cursor-pointer
+                    ${
+                      getActiveTab() === "home"
+                        ? "bg-blue-50 border border-blue-200"
+                        : "hover:bg-gray-50"
+                    }
+                  `}
+                >
+                  <HomeIcon
+                    className={`w-5 h-5 ${
+                      getActiveTab() === "home"
+                        ? "text-blue-600"
+                        : "text-gray-600"
+                    }`}
+                  />
+                  <span
+                    className={`font-medium ${
+                      getActiveTab() === "home"
+                        ? "text-blue-800"
+                        : "text-gray-800"
+                    }`}
+                  >
+                    Home
+                  </span>
+                </div>
+
+                {/* Discover */}
+                <div
+                  onClick={() => handleTabChange("discover")}
+                  className={`
+                    flex items-center space-x-3 p-3 rounded-lg transition-colors cursor-pointer
+                    ${
+                      getActiveTab() === "discover"
+                        ? "bg-blue-50 border border-blue-200"
+                        : "hover:bg-gray-50"
+                    }
+                  `}
+                >
+                  <Search
+                    className={`w-5 h-5 ${
+                      getActiveTab() === "discover"
+                        ? "text-blue-600"
+                        : "text-gray-600"
+                    }`}
+                  />
+                  <span
+                    className={`font-medium ${
+                      getActiveTab() === "discover"
+                        ? "text-blue-800"
+                        : "text-gray-800"
+                    }`}
+                  >
+                    Discover
+                  </span>
+                </div>
+
+                {/* My Trips */}
+                <div
+                  onClick={() => handleTabChange("trips")}
+                  className={`
+                    flex items-center space-x-3 p-3 rounded-lg transition-colors cursor-pointer
+                    ${
+                      getActiveTab() === "trips"
+                        ? "bg-blue-50 border border-blue-200"
+                        : "hover:bg-gray-50"
+                    }
+                  `}
+                >
+                  <MapPin
+                    className={`w-5 h-5 ${
+                      getActiveTab() === "trips"
+                        ? "text-blue-600"
+                        : "text-gray-600"
+                    }`}
+                  />
+                  <span
+                    className={`font-medium ${
+                      getActiveTab() === "trips"
+                        ? "text-blue-800"
+                        : "text-gray-800"
+                    }`}
+                  >
+                    My Trips
+                  </span>
+                </div>
+
+                {/* Favorites */}
+                <div
+                  onClick={() => handleTabChange("favorites")}
+                  className={`
+                    flex items-center space-x-3 p-3 rounded-lg transition-colors cursor-pointer
+                    ${
+                      getActiveTab() === "favorites"
+                        ? "bg-blue-50 border border-blue-200"
+                        : "hover:bg-gray-50"
+                    }
+                  `}
+                >
+                  <Heart
+                    className={`w-5 h-5 ${
+                      getActiveTab() === "favorites"
+                        ? "text-blue-600"
+                        : "text-gray-600"
+                    }`}
+                  />
+                  <span
+                    className={`font-medium ${
+                      getActiveTab() === "favorites"
+                        ? "text-blue-800"
+                        : "text-gray-800"
+                    }`}
+                  >
+                    Favorites
+                  </span>
+                </div>
+
+                {/* Dashboard */}
+                <div
+                  onClick={() => handleTabChange("dashboard")}
+                  className={`
+                    flex items-center space-x-3 p-3 rounded-lg transition-colors cursor-pointer
+                    ${
+                      getActiveTab() === "dashboard"
+                        ? "bg-blue-50 border border-blue-200"
+                        : "hover:bg-gray-50"
+                    }
+                  `}
+                >
+                  <BarChart3
+                    className={`w-5 h-5 ${
+                      getActiveTab() === "dashboard"
+                        ? "text-blue-600"
+                        : "text-gray-600"
+                    }`}
+                  />
+                  <span
+                    className={`font-medium ${
+                      getActiveTab() === "dashboard"
+                        ? "text-blue-800"
+                        : "text-gray-800"
+                    }`}
+                  >
+                    Dashboard
+                  </span>
+                </div>
+
+                {/* Profile */}
+                <div
+                  onClick={() => handleTabChange("profile")}
+                  className={`
+                    flex items-center space-x-3 p-3 rounded-lg transition-colors cursor-pointer
+                    ${
+                      getActiveTab() === "profile"
+                        ? "bg-blue-50 border border-blue-200"
+                        : "hover:bg-gray-50"
+                    }
+                  `}
+                >
+                  <User
+                    className={`w-5 h-5 ${
+                      getActiveTab() === "profile"
+                        ? "text-blue-600"
+                        : "text-gray-600"
+                    }`}
+                  />
+                  <span
+                    className={`font-medium ${
+                      getActiveTab() === "profile"
+                        ? "text-blue-800"
+                        : "text-gray-800"
+                    }`}
+                  >
+                    Profile
+                  </span>
+                </div>
+              </div>
+
+              {/* Menu Footer */}
+              <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-gray-50">
+                <div className="text-center text-sm text-gray-500">
+                  Trip Planner v1.0
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* MAIN CONTENT - Pass mobile menu state to prevent duplicate menus */}
+      <div>
+        {currentView === "app" && (
+          <TravelItineraryApp
+            onTabChange={handleTabChange}
+            hideMobileNav={true} // Pass prop to hide duplicate nav
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        )}
+        {currentView === "profile" && <ProfilePage />}
+        {currentView === "dashboard" && <DashboardPage />}
+        {currentView === "trips" && <TripFolders />}
+        {currentView === "favorites" && <FavoritesContent />}
+      </div>
     </div>
   );
 }
