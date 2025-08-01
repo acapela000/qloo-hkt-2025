@@ -17,6 +17,7 @@ interface SpotCardProps {
   address?: string;
   tags?: string[];
   qlooScore?: number;
+  rating?: number;
   onAddToItinerary?: (spot: any) => void;
 }
 

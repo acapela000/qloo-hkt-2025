@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useSearchResults } from "@/hooks/useSearchResults";
+import { Recommendation, useSearchResults } from "@/hooks/useSearchResults";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -455,14 +455,49 @@ const TravelItineraryApp: React.FC<TravelItineraryAppProps> = ({
                       {recommendation.tags &&
                         recommendation.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1 mb-3">
-                            {recommendation.tags.slice(0, 3).map((tag, idx) => (
-                              <span
-                                key={idx}
-                                className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
-                              >
-                                {tag}
-                              </span>
-                            ))}
+                            {recommendation.tags
+                              .slice(0, 3)
+                              .map(
+                                (
+                                  tag:
+                                    | string
+                                    | number
+                                    | bigint
+                                    | boolean
+                                    | React.ReactElement<
+                                        unknown,
+                                        | string
+                                        | React.JSXElementConstructor<any>
+                                      >
+                                    | Iterable<React.ReactNode>
+                                    | React.ReactPortal
+                                    | Promise<
+                                        | string
+                                        | number
+                                        | bigint
+                                        | boolean
+                                        | React.ReactPortal
+                                        | React.ReactElement<
+                                            unknown,
+                                            | string
+                                            | React.JSXElementConstructor<any>
+                                          >
+                                        | Iterable<React.ReactNode>
+                                        | null
+                                        | undefined
+                                      >
+                                    | null
+                                    | undefined,
+                                  idx: React.Key | null | undefined
+                                ) => (
+                                  <span
+                                    key={idx}
+                                    className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
+                                  >
+                                    {tag}
+                                  </span>
+                                )
+                              )}
                           </div>
                         )}
 
