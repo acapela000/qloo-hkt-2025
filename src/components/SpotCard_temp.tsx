@@ -14,7 +14,6 @@ interface SpotCardProps {
   description?: string;
   category?: string;
   type?: string;
-  rating?: number;
   address?: string;
   tags?: string[];
   qlooScore?: number;
