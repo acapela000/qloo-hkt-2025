@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import SpotCard from "./SpotCard_temp";
+import SpotCard from "./SpotCard";
 import { type Recommendation } from "@/services/QlooApiService";
 
 interface PaginatedRecommendationsProps {
