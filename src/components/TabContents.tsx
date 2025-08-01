@@ -1,6 +1,6 @@
 import React from "react";
 import { useFavorites } from "@/lib/favouriteSys";
-import SpotCard from "./SpotCard";
+import SpotCard from "@/components/SpotCard";
 import { Button } from "@/components/ui/button";
 
 export const HomeContent: React.FC = () => (

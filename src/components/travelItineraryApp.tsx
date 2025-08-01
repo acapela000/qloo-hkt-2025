@@ -16,9 +16,9 @@ import {
 } from "lucide-react";
 //import SpotCard from "./SpotCard";
 import qlooService from "@/services/QlooApiService";
-import TravelTips from "./TravelTips";
-import MyTrips from "./TripCard";
-import PlannerSidebar from "./PlannerSidebar";
+import TravelTips from "@/components/TravelTips";
+import MyTrips from "@/components/TripCard";
+import PlannerSidebar from "@/components/PlannerSidebar";
 
 interface TravelItineraryAppProps {
   onAddToItinerary?: (item: any, itineraryId?: string) => void;
