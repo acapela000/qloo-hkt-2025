@@ -8,40 +8,80 @@ import { MapPin } from "lucide-react";
 import { useFavorites } from "@/lib/favouriteSys";
 
 interface SpotCardProps {
-  spot: {
-    id: string;
-    name: string;
-    type: string;
-    description?: string;
-    image?: string;
-    rating?: number;
-    address?: string;
-    tags?: string[];
-    qlooScore?: number;
-  };
+  id: string;
+  name: string;
+  image?: string;
+  description?: string;
+  category?: string;
+  type?: string;
+  rating?: number;
+  address?: string;
+  tags?: string[];
+  qlooScore?: number;
   onAddToItinerary?: (spot: any) => void;
 }
 
-const SpotCard: React.FC<SpotCardProps> = ({ spot, onAddToItinerary }) => {
+const SpotCard: React.FC<SpotCardProps> = ({
+  id,
+  name,
+  image,
+  description,
+  category,
+  type,
+  rating,
+  address,
+  tags,
+  qlooScore,
+  onAddToItinerary,
+}) => {
   console.log("=== SPOTCARD RECEIVED DATA ===");
-  console.log("Spot name:", spot?.name);
-  console.log("Spot type:", spot?.type);
-  console.log("Spot description:", spot?.description);
-  console.log("Spot address:", spot?.address);
-  console.log("Spot image:", spot?.image);
-  console.log("Full spot object:", JSON.stringify(spot, null, 2));
+  console.log("Spot name:", name);
+  console.log("Spot type:", type);
+  console.log("Spot description:", description);
+  console.log("Spot address:", address);
+  console.log("Spot image:", image);
+  console.log(
+    "Full spot object:",
+    JSON.stringify(
+      {
+        id,
+        name,
+        image,
+        description,
+        category,
+        type,
+        rating,
+        address,
+        tags,
+        qlooScore,
+      },
+      null,
+      2
+    )
+  );
   console.log("=== END SPOTCARD DATA ===");
 
   const { favorites, addToFavorites, removeFromFavorites } = useFavorites();
-  const isFavorite = favorites.some((fav) => fav.id === spot.id);
+  const isFavorite = favorites.some((fav) => fav.id === id);
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
 
   const handleFavoriteToggle = () => {
     if (isFavorite) {
-      removeFromFavorites(spot.id);
+      removeFromFavorites(id);
     } else {
-      addToFavorites(spot);
+      addToFavorites({
+        id,
+        name,
+        image,
+        description,
+        category,
+        type,
+        rating,
+        address,
+        tags,
+        qlooScore,
+      });
     }
   };
 
@@ -55,17 +95,17 @@ const SpotCard: React.FC<SpotCardProps> = ({ spot, onAddToItinerary }) => {
   };
 
   const getImageUrl = () => {
-    if (spot.image && !imageError) {
-      return spot.image;
+    if (image && !imageError) {
+      return image;
     }
 
     const fallbackImages = [
-      `https://picsum.photos/400/300?random=${spot.id}`,
+      `https://picsum.photos/400/300?random=${id}`,
       `https://source.unsplash.com/400x300/?${encodeURIComponent(
-        spot.type
+        type || ""
       )},destination`,
       `https://via.placeholder.com/400x300/f3f4f6/6b7280?text=${encodeURIComponent(
-        spot.name
+        name
       )}`,
     ];
 
@@ -122,9 +162,9 @@ const SpotCard: React.FC<SpotCardProps> = ({ spot, onAddToItinerary }) => {
   return (
     <Card
       className={`${getBorderColor(
-        spot.type
+        type || ""
       )} border-2 sm:border-3 shadow-lg sm:shadow-xl hover:shadow-xl sm:hover:shadow-2xl transition-all duration-300 transform hover:scale-105 bg-gradient-to-br ${getBackgroundGradient(
-        spot.type
+        type || ""
       )} overflow-hidden w-full max-w-sm mx-auto sm:max-w-none`}
     >
       <div className="relative h-32 sm:h-40 lg:h-48 overflow-hidden bg-gray-200">
@@ -146,7 +186,7 @@ const SpotCard: React.FC<SpotCardProps> = ({ spot, onAddToItinerary }) => {
 
         <img
           src={getImageUrl()}
-          alt={spot.name}
+          alt={name}
           className={`w-full h-full object-cover transition-opacity duration-300 ${
             imageLoading ? "opacity-0" : "opacity-100"
           }`}
@@ -173,47 +213,57 @@ const SpotCard: React.FC<SpotCardProps> = ({ spot, onAddToItinerary }) => {
         <div className="absolute top-2 sm:top-3 left-2 sm:left-3">
           <Badge
             className={`bg-gradient-to-r ${getTypeColor(
-              spot.type
+              type || ""
             )} text-white shadow-lg border-0 text-xs sm:text-sm px-2 py-1`}
           >
-            {spot.type}
+            {type}
           </Badge>
         </div>
 
-        {spot.rating && (
+        {rating && (
           <div className="absolute bottom-2 sm:bottom-3 right-2 sm:right-3 bg-white/95 backdrop-blur-sm rounded-full px-2 sm:px-3 py-1 shadow-lg">
             <div className="flex items-center space-x-1">
               <span className="text-yellow-500 text-sm sm:text-base">★</span>
               <span className="font-semibold text-gray-800 text-xs sm:text-sm">
-                {spot.rating.toFixed(1)}
+                {rating.toFixed(1)}
               </span>
             </div>
           </div>
         )}
       </div>
 
+      <div className="p-4">
+        {category && (
+          <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full mb-2">
+            {category}
+          </span>
+        )}
+        <h3 className="font-semibold text-lg mb-2">{name}</h3>
+        {description && <p className="text-gray-600 text-sm">{description}</p>}
+      </div>
+
       <div className="p-3 sm:p-4 lg:p-6">
         <div className="space-y-2 sm:space-y-3">
           <h3 className="font-bold text-sm sm:text-base lg:text-lg text-gray-800 line-clamp-2 leading-tight">
-            {spot.name}
+            {name}
           </h3>
 
-          {spot.description && (
+          {description && (
             <p className="text-xs sm:text-sm text-gray-600 line-clamp-2 leading-relaxed">
-              {spot.description}
+              {description}
             </p>
           )}
 
-          {spot.address && (
+          {address && (
             <div className="flex items-start space-x-1 sm:space-x-2 text-xs sm:text-sm text-gray-500">
               <MapPin className="h-3 w-3 sm:h-4 sm:w-4 mt-0.5 flex-shrink-0" />
-              <span className="line-clamp-2 leading-tight">{spot.address}</span>
+              <span className="line-clamp-2 leading-tight">{address}</span>
             </div>
           )}
 
-          {spot.tags && spot.tags.length > 0 && (
+          {tags && tags.length > 0 && (
             <div className="flex flex-wrap gap-1 sm:gap-2 mt-2 sm:mt-3">
-              {spot.tags.slice(0, 3).map((tag, index) => (
+              {tags.slice(0, 3).map((tag, index) => (
                 <Badge
                   key={index}
                   variant="outline"
@@ -222,18 +272,18 @@ const SpotCard: React.FC<SpotCardProps> = ({ spot, onAddToItinerary }) => {
                   {tag}
                 </Badge>
               ))}
-              {spot.tags.length > 3 && (
+              {tags.length > 3 && (
                 <Badge
                   variant="outline"
                   className="text-xs px-1.5 py-0.5 sm:px-2 sm:py-1 border-gray-300 text-gray-500"
                 >
-                  +{spot.tags.length - 3}
+                  +{tags.length - 3}
                 </Badge>
               )}
             </div>
           )}
 
-          {spot.qlooScore && (
+          {qlooScore && (
             <div className="flex items-center justify-between pt-2 sm:pt-3 border-t border-gray-200">
               <span className="text-xs sm:text-sm font-medium text-gray-600">
                 Qloo Score
@@ -242,11 +292,11 @@ const SpotCard: React.FC<SpotCardProps> = ({ spot, onAddToItinerary }) => {
                 <div className="w-12 sm:w-16 bg-gray-200 rounded-full h-1.5 sm:h-2">
                   <div
                     className="bg-gradient-to-r from-primary-500 to-accent-500 h-1.5 sm:h-2 rounded-full transition-all duration-500"
-                    style={{ width: `${(spot.qlooScore / 100) * 100}%` }}
+                    style={{ width: `${(qlooScore / 100) * 100}%` }}
                   ></div>
                 </div>
                 <span className="text-xs sm:text-sm font-bold text-primary-600">
-                  {spot.qlooScore}/100
+                  {qlooScore}/100
                 </span>
               </div>
             </div>
@@ -254,7 +304,20 @@ const SpotCard: React.FC<SpotCardProps> = ({ spot, onAddToItinerary }) => {
         </div>
 
         <Button
-          onClick={() => onAddToItinerary?.(spot)}
+          onClick={() =>
+            onAddToItinerary?.({
+              id,
+              name,
+              image,
+              description,
+              category,
+              type,
+              rating,
+              address,
+              tags,
+              qlooScore,
+            })
+          }
           className="w-full mt-3 sm:mt-4 bg-gradient-to-r from-secondary-500 to-accent-500 hover:from-secondary-600 hover:to-accent-600 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 text-xs sm:text-sm py-2 sm:py-2.5"
         >
           <span className="mr-1 sm:mr-2">📝</span>

@@ -3,8 +3,6 @@
 import React, { useState, useEffect } from "react";
 import { useSearchResults } from "@/hooks/useSearchResults";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Loader2,
@@ -15,10 +13,8 @@ import {
   Home,
   Heart,
   BarChart3,
-  User,
 } from "lucide-react";
-import SpotCard from "./SpotCard";
-import { QlooApiService } from "@/services/QlooApiService";
+//import SpotCard from "./SpotCard";
 import qlooService from "@/services/QlooApiService";
 import TravelTips from "./TravelTips";
 import MyTrips from "./TripCard";
